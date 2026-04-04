@@ -1,0 +1,20 @@
+{
+  "name": "@packages/diagram",
+  "version": "1.0.0",
+  "description": "Shared diagram types, validation, geometry, and rendering primitives",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "roughjs": "4.6.6",
+    "zod": "4.3.6"
+  }
+}
