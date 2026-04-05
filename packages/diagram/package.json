@@ -7,6 +7,8 @@
     ".": "./index.ts"
   },
   "scripts": {
+    "test": "pnpm --workspace-root run test:diagram",
+    "test:coverage": "pnpm --workspace-root run test:diagram:coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "keywords": [],
