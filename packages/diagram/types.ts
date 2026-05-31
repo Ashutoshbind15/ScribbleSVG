@@ -23,6 +23,7 @@ export interface RectangleElement extends BaseElement {
   width: number;
   height: number;
   text?: string;
+  fontSize?: number; // default 14
 }
 
 export interface CircleElement extends BaseElement {
@@ -31,6 +32,7 @@ export interface CircleElement extends BaseElement {
   cy: number;
   radius: number;
   text?: string;
+  fontSize?: number; // default 14
 }
 
 export interface CylinderElement extends BaseElement {
@@ -40,6 +42,7 @@ export interface CylinderElement extends BaseElement {
   width: number;
   height: number;
   text?: string;
+  fontSize?: number; // default 14
 }
 
 // Standalone text element

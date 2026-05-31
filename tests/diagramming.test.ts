@@ -13,6 +13,7 @@ import {
   getElementRoughPaths,
   isDiagramDocument,
   parseDiagramDocument,
+  scaleFontSizeForResize,
 } from "../packages/diagram/index.ts";
 import type {
   ArrowElement,
@@ -253,6 +254,14 @@ describe("@packages/diagram", () => {
       width: 120,
       height: 40,
     });
+  });
+
+  test("scales font size proportionally when bounds change", () => {
+    const start = { x: 0, y: 0, width: 100, height: 100 };
+    const doubled = { x: 0, y: 0, width: 200, height: 200 };
+    assert.equal(scaleFontSizeForResize(14, doubled, start), 28);
+    assert.equal(scaleFontSizeForResize(16, doubled, start), 32);
+    assert.equal(scaleFontSizeForResize(8, { x: 0, y: 0, width: 10, height: 10 }, start), 8);
   });
 
   test("computes content bounds across mixed coordinates", () => {

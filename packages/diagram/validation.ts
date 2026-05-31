@@ -12,6 +12,7 @@ const RectangleElementSchema = z.object({
   width: z.number(),
   height: z.number(),
   text: z.string().optional(),
+  fontSize: z.number().optional(),
 });
 
 const CircleElementSchema = z.object({
@@ -22,6 +23,7 @@ const CircleElementSchema = z.object({
   cy: z.number(),
   radius: z.number(),
   text: z.string().optional(),
+  fontSize: z.number().optional(),
 });
 
 const CylinderElementSchema = z.object({
@@ -33,6 +35,7 @@ const CylinderElementSchema = z.object({
   width: z.number(),
   height: z.number(),
   text: z.string().optional(),
+  fontSize: z.number().optional(),
 });
 
 const TextElementSchema = z.object({

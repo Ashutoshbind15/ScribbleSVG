@@ -231,3 +231,21 @@ function lineRectIntersection(
     y: inside.y + tMin * dy,
   };
 }
+
+/**
+ * Scale a font size proportionally when an element's bounds change during resize.
+ * Uses geometric mean of width/height scale factors (same as standalone text).
+ */
+export function scaleFontSizeForResize(
+  baseFontSize: number,
+  newBounds: Bounds,
+  startBounds: Bounds,
+  minFontSize = 8,
+): number {
+  const scaleX =
+    startBounds.width > 0 ? newBounds.width / startBounds.width : 1;
+  const scaleY =
+    startBounds.height > 0 ? newBounds.height / startBounds.height : 1;
+  const scale = Math.sqrt(scaleX * scaleY);
+  return Math.max(minFontSize, baseFontSize * scale);
+}

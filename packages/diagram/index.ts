@@ -23,6 +23,7 @@ export {
   getElementCenter,
   getElementConnectionPoints,
   getAnchorPoint,
+  scaleFontSizeForResize,
 } from "./geometry";
 
 // Rendering
@@ -33,4 +34,8 @@ export { getElementRoughPaths } from "./render";
 export { generateSeed } from "./seed";
 
 // Constants
-export { DEFAULT_VIEWPORT, EMPTY_DOCUMENT } from "./constants";
+export {
+  DEFAULT_VIEWPORT,
+  DEFAULT_SHAPE_LABEL_FONT_SIZE,
+  EMPTY_DOCUMENT,
+} from "./constants";
