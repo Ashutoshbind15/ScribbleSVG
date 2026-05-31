@@ -6,6 +6,7 @@ import {
   EMPTY_DOCUMENT,
   generateSeed,
   getAnchorPoint,
+  getElementConnectionPoints,
   getContentBounds,
   getElementBounds,
   getElementCenter,
@@ -33,6 +34,7 @@ import {
   hitTest,
   hitTestElement,
   hitTestResizeHandle,
+  hitTestConnectionPoint,
 } from "../cms-client/src/components/diagram-canvas/hit-test.ts";
 import {
   canvasReducer,
@@ -241,6 +243,16 @@ describe("@packages/diagram", () => {
     );
     assertClose(emptyTextBounds.width, 9.6, "empty text minimum width");
     assertClose(emptyTextBounds.height, 19.2, "empty text minimum height");
+
+    const explicitTextBounds = getElementBounds(
+      createText({ x: 10, y: 20, text: "Hi", width: 120, height: 40 }),
+    );
+    assert.deepEqual(explicitTextBounds, {
+      x: 10,
+      y: 20,
+      width: 120,
+      height: 40,
+    });
   });
 
   test("computes content bounds across mixed coordinates", () => {
@@ -303,6 +315,36 @@ describe("@packages/diagram", () => {
       getAnchorPoint(rectangle, rectangleCenter),
       rectangleCenter,
     );
+
+    const text = createText({
+      x: 100,
+      y: 50,
+      text: "Label",
+      fontSize: 16,
+      width: 80,
+      height: 30,
+    });
+    const textAnchorRight = getAnchorPoint(text, { x: 300, y: 65 });
+    assertClose(textAnchorRight.x, 180, "text right edge x");
+    assertClose(textAnchorRight.y, 65, "text right edge y");
+  });
+
+  test("exposes eight connection points per bindable shape", () => {
+    const rectangle = createRectangle();
+    const rectPoints = getElementConnectionPoints(rectangle);
+    assert.equal(rectPoints.length, 8);
+    assert.deepEqual(rectPoints[1], { x: 60, y: 20 });
+    assert.deepEqual(rectPoints[3], { x: 110, y: 45 });
+
+    const circle = createCircle();
+    const circlePoints = getElementConnectionPoints(circle);
+    assert.equal(circlePoints.length, 8);
+    assertClose(circlePoints[0].x, 200, "circle top x");
+    assertClose(circlePoints[0].y, 160, "circle top y");
+    assertClose(circlePoints[2].x, 240, "circle right x");
+    assertClose(circlePoints[2].y, 200, "circle right y");
+
+    assert.equal(getElementConnectionPoints(createArrow()).length, 0);
   });
 
   test("generates serializable rough paths for renderable elements", () => {
@@ -768,5 +810,27 @@ describe("canvas hit testing", () => {
     assert.equal(hitTestResizeHandle({ x: 13, y: 23 }, bounds, 5), "nw");
     assert.equal(hitTestResizeHandle({ x: 115, y: 75 }, bounds, 5), "se");
     assert.equal(hitTestResizeHandle({ x: 60, y: 45 }, bounds, 5), null);
+  });
+
+  test("hit-tests connection points with topmost element preference", () => {
+    const back = createRectangle({ id: "back", x: 0, y: 0, width: 200, height: 200 });
+    const front = createRectangle({
+      id: "front",
+      x: 50,
+      y: 50,
+      width: 100,
+      height: 50,
+    });
+
+    const hit = hitTestConnectionPoint({ x: 100, y: 50 }, [back, front], 8);
+    assert.ok(hit);
+    assert.equal(hit.elementId, "front");
+    assertClose(hit.point.x, 100, "front top midpoint x");
+    assertClose(hit.point.y, 50, "front top midpoint y");
+
+    assert.equal(
+      hitTestConnectionPoint({ x: 999, y: 999 }, [back, front], 8),
+      null,
+    );
   });
 });

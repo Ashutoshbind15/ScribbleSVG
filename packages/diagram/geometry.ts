@@ -3,6 +3,7 @@ import type {
   RectangleElement,
   CircleElement,
   CylinderElement,
+  TextElement,
 } from "./types";
 
 // ── Bounding boxes ──
@@ -34,6 +35,9 @@ export function getElementBounds(el: DiagramElement): Bounds {
       return { x: el.x, y: el.y, width: el.width, height: el.height };
 
     case "text": {
+      if (el.width != null && el.height != null) {
+        return { x: el.x, y: el.y, width: el.width, height: el.height };
+      }
       const fontSize = el.fontSize ?? 16;
       // Split by newlines for multi-line text bounds
       const lines = el.text.split("\n");
@@ -94,8 +98,47 @@ export function getElementCenter(el: DiagramElement): { x: number; y: number } {
  * intersects the shape boundary. Used for arrow rendering when an
  * arrow is bound to a shape.
  */
+export interface ConnectionPoint {
+  x: number;
+  y: number;
+}
+
+/** Eight snap points per shape (edge midpoints + corners, or compass points on circles). */
+export function getElementConnectionPoints(
+  element: DiagramElement,
+): ConnectionPoint[] {
+  if (element.type === "arrow") return [];
+
+  if (element.type === "circle") {
+    const { cx, cy, radius } = element;
+    const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+    return angles.map((deg) => {
+      const rad = (deg * Math.PI) / 180;
+      return {
+        x: cx + radius * Math.sin(rad),
+        y: cy - radius * Math.cos(rad),
+      };
+    });
+  }
+
+  const { x, y, width, height } = getElementBounds(element);
+  const mx = x + width / 2;
+  const my = y + height / 2;
+
+  return [
+    { x, y },
+    { x: mx, y },
+    { x: x + width, y },
+    { x: x + width, y: my },
+    { x: x + width, y: y + height },
+    { x: mx, y: y + height },
+    { x, y: y + height },
+    { x, y: my },
+  ];
+}
+
 export function getAnchorPoint(
-  element: RectangleElement | CircleElement | CylinderElement,
+  element: RectangleElement | CircleElement | CylinderElement | TextElement,
   from: { x: number; y: number },
 ): { x: number; y: number } {
   const center = getElementCenter(element);
@@ -113,7 +156,7 @@ export function getAnchorPoint(
     };
   }
 
-  // Rectangle or cylinder: intersect line from center→from with bounding box
+  // Rectangle, cylinder, or text: intersect line from center→from with bounding box
   const bounds = getElementBounds(element);
   return lineRectIntersection(center, from, bounds);
 }

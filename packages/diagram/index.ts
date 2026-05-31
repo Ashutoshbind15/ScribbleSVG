@@ -16,11 +16,12 @@ export type {
 export { parseDiagramDocument, isDiagramDocument } from "./validation";
 
 // Geometry
-export type { Bounds } from "./geometry";
+export type { Bounds, ConnectionPoint } from "./geometry";
 export {
   getElementBounds,
   getContentBounds,
   getElementCenter,
+  getElementConnectionPoints,
   getAnchorPoint,
 } from "./geometry";
 

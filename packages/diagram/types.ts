@@ -50,6 +50,9 @@ export interface TextElement extends BaseElement {
   y: number;
   text: string;
   fontSize?: number; // default 16
+  /** Explicit box size (set after resize); omitted until first resize */
+  width?: number;
+  height?: number;
 }
 
 // Arrow element

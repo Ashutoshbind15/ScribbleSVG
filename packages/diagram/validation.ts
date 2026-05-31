@@ -43,6 +43,8 @@ const TextElementSchema = z.object({
   y: z.number(),
   text: z.string(),
   fontSize: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
 });
 
 const ArrowElementSchema = z.object({
