@@ -29,19 +29,19 @@ import {
   canvasToScreen,
   getViewBox,
   screenToCanvas,
-} from "../cms-client/src/components/diagram-canvas/coordinate-utils.ts";
+} from "../packages/diagram-react/src/editor/coordinate-utils.ts";
 import {
   getResizeHandles,
   hitTest,
   hitTestElement,
   hitTestResizeHandle,
   hitTestConnectionPoint,
-} from "../cms-client/src/components/diagram-canvas/hit-test.ts";
+} from "../packages/diagram-react/src/editor/hit-test.ts";
 import {
   canvasReducer,
   type CanvasState,
   type ToolType,
-} from "../cms-client/src/components/diagram-canvas/useCanvasReducer.ts";
+} from "../packages/diagram-react/src/editor/useCanvasReducer.ts";
 import {
   diagramSnapshot,
   parsePayload,

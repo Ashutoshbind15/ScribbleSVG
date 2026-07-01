@@ -1,0 +1,30 @@
+{
+  "name": "@packages/diagram-react",
+  "version": "1.0.0",
+  "description": "React components for diagram rendering and editing",
+  "type": "module",
+  "exports": {
+    "./renderer": "./src/diagram-renderer.tsx",
+    "./editor": "./src/editor/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.0",
+  "peerDependencies": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "dependencies": {
+    "@packages/diagram": "workspace:*",
+    "lucide-react": "1.7.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "6.0.2"
+  }
+}
