@@ -37,5 +37,6 @@ export { generateSeed } from "./seed";
 export {
   DEFAULT_VIEWPORT,
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
+  DEFAULT_TEXT_FONT_SIZE,
   EMPTY_DOCUMENT,
 } from "./constants";

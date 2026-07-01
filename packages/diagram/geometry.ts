@@ -5,6 +5,7 @@ import type {
   CylinderElement,
   TextElement,
 } from "./types";
+import { DEFAULT_TEXT_FONT_SIZE } from "./constants";
 
 // ── Bounding boxes ──
 
@@ -38,7 +39,7 @@ export function getElementBounds(el: DiagramElement): Bounds {
       if (el.width != null && el.height != null) {
         return { x: el.x, y: el.y, width: el.width, height: el.height };
       }
-      const fontSize = el.fontSize ?? 16;
+      const fontSize = el.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
       // Split by newlines for multi-line text bounds
       const lines = el.text.split("\n");
       const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
