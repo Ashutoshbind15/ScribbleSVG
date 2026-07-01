@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./renderer": "./src/diagram-renderer.tsx",
+    "./colors": "./src/colors.ts",
     "./editor": "./src/editor/index.ts"
   },
   "scripts": {

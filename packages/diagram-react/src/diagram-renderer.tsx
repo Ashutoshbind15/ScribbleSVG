@@ -6,13 +6,33 @@ import {
   type DiagramDocument,
   type DiagramElement,
 } from "@packages/diagram";
+import {
+  resolveDiagramColors,
+  type DiagramColorPreset,
+  type DiagramColors,
+} from "./colors";
+
+export type {
+  DiagramColors,
+  DiagramColorPreset,
+  ResolveDiagramColorsOptions,
+} from "./colors";
+export {
+  DEFAULT_DIAGRAM_COLORS,
+  DIAGRAM_COLOR_PRESETS,
+  resolveDiagramColors,
+} from "./colors";
 
 const DIAGRAM_PADDING = 24;
 const EMPTY_STATE_WIDTH = 240;
 const EMPTY_STATE_HEIGHT = 140;
 const LINE_HEIGHT = 1.2;
 
-function renderTextElement(element: DiagramElement, bounds: ReturnType<typeof getElementBounds>) {
+function renderTextElement(
+  element: DiagramElement,
+  bounds: ReturnType<typeof getElementBounds>,
+  textColor: string,
+) {
   if (element.type === "text") {
     const fontSize = element.fontSize ?? 16;
     const lineHeight = fontSize * LINE_HEIGHT;
@@ -24,7 +44,7 @@ function renderTextElement(element: DiagramElement, bounds: ReturnType<typeof ge
         y={baselineY}
         fontSize={fontSize}
         fontFamily="'Segoe UI', system-ui, sans-serif"
-        fill="currentColor"
+        fill={textColor}
       >
         {element.text.split("\n").map((line, index) => (
           <tspan key={index} x={element.x} dy={index === 0 ? 0 : lineHeight}>
@@ -53,7 +73,7 @@ function renderTextElement(element: DiagramElement, bounds: ReturnType<typeof ge
       y={cy}
       fontSize={fontSize}
       fontFamily="'Segoe UI', system-ui, sans-serif"
-      fill="currentColor"
+      fill={textColor}
       textAnchor="middle"
       dominantBaseline="central"
     >
@@ -66,7 +86,22 @@ function renderTextElement(element: DiagramElement, bounds: ReturnType<typeof ge
   );
 }
 
-export function DiagramRenderer({ document }: { document: DiagramDocument }) {
+export type DiagramRendererProps = {
+  document: DiagramDocument;
+  /** Built-in palette to start from. Defaults to theme-aware `inherit`. */
+  colorPreset?: DiagramColorPreset;
+  /** Override individual colors on top of the preset. */
+  colors?: Partial<DiagramColors>;
+  className?: string;
+};
+
+export function DiagramRenderer({
+  document,
+  colorPreset,
+  colors,
+  className,
+}: DiagramRendererProps) {
+  const resolvedColors = resolveDiagramColors({ preset: colorPreset, colors });
   const contentBounds = getContentBounds(document.elements);
   const bounds =
     contentBounds ?? {
@@ -82,7 +117,14 @@ export function DiagramRenderer({ document }: { document: DiagramDocument }) {
   const viewBoxHeight = Math.max(bounds.height + DIAGRAM_PADDING * 2, 1);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background p-4">
+    <div
+      className={[
+        "overflow-hidden rounded-lg border border-border bg-background p-4",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <svg
         width="100%"
         viewBox={`${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`}
@@ -102,12 +144,12 @@ export function DiagramRenderer({ document }: { document: DiagramDocument }) {
                 <path
                   key={`${element.id}-${index}`}
                   d={path.d}
-                  stroke={path.stroke}
+                  stroke={resolvedColors.stroke}
                   strokeWidth={path.strokeWidth}
-                  fill={path.fill}
+                  fill={path.fill === "none" ? resolvedColors.fill : path.fill}
                 />
               ))}
-              {renderTextElement(element, bounds)}
+              {renderTextElement(element, bounds, resolvedColors.text)}
             </g>
           );
         })}
@@ -118,8 +160,8 @@ export function DiagramRenderer({ document }: { document: DiagramDocument }) {
             y={bounds.y + bounds.height / 2}
             textAnchor="middle"
             dominantBaseline="middle"
-            fill="currentColor"
-            opacity="0.55"
+            fill={resolvedColors.text}
+            opacity={resolvedColors.mutedTextOpacity}
           >
             Empty diagram
           </text>

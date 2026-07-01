@@ -43,6 +43,11 @@ import {
   type ToolType,
 } from "../packages/diagram-react/src/editor/useCanvasReducer.ts";
 import {
+  resolveDiagramColors,
+  DIAGRAM_COLOR_PRESETS,
+  DEFAULT_DIAGRAM_COLORS,
+} from "../packages/diagram-react/src/colors.ts";
+import {
   diagramSnapshot,
   parsePayload,
 } from "../cms-client/src/pages/diagrams/diagram-utils.ts";
@@ -841,5 +846,30 @@ describe("canvas hit testing", () => {
       hitTestConnectionPoint({ x: 999, y: 999 }, [back, front], 8),
       null,
     );
+  });
+});
+
+describe("diagram renderer colors", () => {
+  test("defaults to theme-aware inherit colors", () => {
+    assert.deepEqual(DEFAULT_DIAGRAM_COLORS, DIAGRAM_COLOR_PRESETS.inherit);
+    assert.equal(resolveDiagramColors().stroke, "currentColor");
+  });
+
+  test("applies built-in presets", () => {
+    assert.equal(resolveDiagramColors({ preset: "darkBlue" }).stroke, "#93c5fd");
+    assert.equal(
+      resolveDiagramColors({ preset: "darkBlue" }).fill,
+      "rgba(59, 130, 246, 0.06)",
+    );
+  });
+
+  test("merges custom overrides on top of presets", () => {
+    const colors = resolveDiagramColors({
+      preset: "dark",
+      colors: { stroke: "#60a5fa" },
+    });
+
+    assert.equal(colors.stroke, "#60a5fa");
+    assert.equal(colors.text, "currentColor");
   });
 });
