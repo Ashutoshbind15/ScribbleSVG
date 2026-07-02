@@ -1,20 +1,47 @@
 {
   "name": "@scribblesvg/core",
   "version": "0.1.0",
-  "description": "Shared diagram types, validation, geometry, and rendering primitives",
+  "description": "Diagram types, geometry, validation, and SVG rendering primitives with a hand-drawn scribble style",
   "type": "module",
+  "sideEffects": false,
   "exports": {
-    ".": "./index.ts"
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    }
   },
+  "types": "./index.ts",
+  "files": [
+    "*.ts",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "pnpm --workspace-root run test:diagram",
     "test:coverage": "pnpm --workspace-root run test:diagram:coverage",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "svg",
+    "diagram",
+    "scribble",
+    "hand-drawn",
+    "sketch"
+  ],
+  "author": "Bind Ashutosh Parasnath <91549538+Ashutoshbind15@users.noreply.github.com>",
   "license": "MIT",
-  "packageManager": "pnpm@10.33.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ashutoshbind15/ScribbleSVG.git",
+    "directory": "packages/diagram"
+  },
+  "homepage": "https://github.com/Ashutoshbind15/ScribbleSVG#readme",
+  "bugs": {
+    "url": "https://github.com/Ashutoshbind15/ScribbleSVG/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "roughjs": "4.6.6",
     "zod": "4.3.6"

@@ -1,23 +1,58 @@
 {
   "name": "@scribblesvg/react-utils",
   "version": "0.1.0",
-  "description": "React components for diagram rendering and editing",
+  "description": "React components for diagram display and editing - DiagramCanvas editor and DiagramRenderer read-only view",
   "type": "module",
+  "sideEffects": false,
   "exports": {
-    "./renderer": "./src/diagram-renderer.tsx",
-    "./colors": "./src/colors.ts",
-    "./editor": "./src/editor/index.ts"
+    "./renderer": {
+      "types": "./src/diagram-renderer.tsx",
+      "default": "./src/diagram-renderer.tsx"
+    },
+    "./colors": {
+      "types": "./src/colors.ts",
+      "default": "./src/colors.ts"
+    },
+    "./editor": {
+      "types": "./src/editor/index.ts",
+      "default": "./src/editor/index.ts"
+    }
   },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "react",
+    "svg",
+    "diagram",
+    "scribble",
+    "hand-drawn",
+    "canvas",
+    "editor",
+    "renderer"
+  ],
+  "author": "Bind Ashutosh Parasnath <91549538+Ashutoshbind15@users.noreply.github.com>",
   "license": "MIT",
-  "packageManager": "pnpm@10.33.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ashutoshbind15/ScribbleSVG.git",
+    "directory": "packages/diagram-react"
+  },
+  "homepage": "https://github.com/Ashutoshbind15/ScribbleSVG#readme",
+  "bugs": {
+    "url": "https://github.com/Ashutoshbind15/ScribbleSVG/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
     "@scribblesvg/core": "workspace:*",
