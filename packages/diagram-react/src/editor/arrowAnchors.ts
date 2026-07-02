@@ -1,6 +1,9 @@
 import type { Dispatch } from "react";
-import type { DiagramElement } from "@packages/diagram";
-import { getAnchorPoint, getElementCenter } from "@packages/diagram";
+import {
+  getAnchorPoint,
+  getElementCenter,
+  type DiagramElement,
+} from "@scribblesvg/core";
 import type { CanvasAction } from "./useCanvasReducer";
 
 export function applyElementPatches(

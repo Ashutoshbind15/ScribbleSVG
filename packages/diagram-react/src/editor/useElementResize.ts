@@ -1,10 +1,11 @@
 import { useCallback, useRef } from "react";
-import type { DiagramElement, Bounds } from "@packages/diagram";
 import {
+  DEFAULT_SHAPE_LABEL_FONT_SIZE,
   getElementBounds,
   scaleFontSizeForResize,
-  DEFAULT_SHAPE_LABEL_FONT_SIZE,
-} from "@packages/diagram";
+  type Bounds,
+  type DiagramElement,
+} from "@scribblesvg/core";
 import type { HandlePosition } from "./hit-test";
 import type { CanvasAction } from "./useCanvasReducer";
 import {

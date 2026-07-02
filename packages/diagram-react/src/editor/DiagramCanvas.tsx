@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { DiagramDocument } from "@packages/diagram";
 import {
-  getElementBounds,
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
-} from "@packages/diagram";
+  getElementBounds,
+  type DiagramDocument,
+} from "@scribblesvg/core";
 import { useCanvasReducer } from "./useCanvasReducer";
 import { getViewBox } from "./coordinate-utils";
 import { screenToCanvas, canvasToScreen } from "./coordinate-utils";

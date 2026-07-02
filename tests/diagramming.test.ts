@@ -14,17 +14,15 @@ import {
   isDiagramDocument,
   parseDiagramDocument,
   scaleFontSizeForResize,
-} from "../packages/diagram/index.ts";
-import type {
-  ArrowElement,
-  CircleElement,
-  CylinderElement,
-  DiagramDocument,
-  DiagramElement,
-  RectangleElement,
-  TextElement,
-  Viewport,
-} from "../packages/diagram/index.ts";
+  type ArrowElement,
+  type CircleElement,
+  type CylinderElement,
+  type DiagramDocument,
+  type DiagramElement,
+  type RectangleElement,
+  type TextElement,
+  type Viewport,
+} from "@scribblesvg/core";
 import {
   canvasToScreen,
   getViewBox,
@@ -50,7 +48,7 @@ import {
 import {
   diagramSnapshot,
   parsePayload,
-} from "../cms-client/src/pages/diagrams/diagram-utils.ts";
+} from '../utils/diagram.ts';
 
 function assertClose(
   actual: number,
@@ -152,7 +150,7 @@ function createCanvasState(
   };
 }
 
-describe("@packages/diagram", () => {
+describe("@scribblesvg/core", () => {
   test("exposes the default viewport and empty document constants", () => {
     assert.deepEqual(DEFAULT_VIEWPORT, { x: 0, y: 0, zoom: 1 });
     assert.equal(EMPTY_DOCUMENT.version, 1);
@@ -353,10 +351,14 @@ describe("@packages/diagram", () => {
     const circle = createCircle();
     const circlePoints = getElementConnectionPoints(circle);
     assert.equal(circlePoints.length, 8);
-    assertClose(circlePoints[0].x, 200, "circle top x");
-    assertClose(circlePoints[0].y, 160, "circle top y");
-    assertClose(circlePoints[2].x, 240, "circle right x");
-    assertClose(circlePoints[2].y, 200, "circle right y");
+    const circleTop = circlePoints[0];
+    const circleRight = circlePoints[2];
+    assert.ok(circleTop);
+    assert.ok(circleRight);
+    assertClose(circleTop.x, 200, "circle top x");
+    assertClose(circleTop.y, 160, "circle top y");
+    assertClose(circleRight.x, 240, "circle right x");
+    assertClose(circleRight.y, 200, "circle right y");
 
     assert.equal(getElementConnectionPoints(createArrow()).length, 0);
   });

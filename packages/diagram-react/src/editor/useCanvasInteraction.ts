@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  DiagramElement,
-  DiagramDocument,
-  RectangleElement,
-  CircleElement,
-  CylinderElement,
-  TextElement,
-  Viewport,
-} from "@packages/diagram";
 import {
-  generateSeed,
-  getElementBounds,
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
-} from "@packages/diagram";
+  generateSeed,
+  getElementBounds,
+  type CircleElement,
+  type CylinderElement,
+  type DiagramDocument,
+  type DiagramElement,
+  type RectangleElement,
+  type TextElement,
+  type Viewport,
+} from "@scribblesvg/core";
 import { screenToCanvas } from "./coordinate-utils";
 import { hitTest, hitTestResizeHandle, hitTestConnectionPoint } from "./hit-test";
 import type { HandlePosition, ConnectionPointHit } from "./hit-test";

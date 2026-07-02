@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import type { DiagramElement } from "@packages/diagram";
-import { getElementBounds } from "@packages/diagram";
+import { getElementBounds, type DiagramElement } from "@scribblesvg/core";
 
 interface SelectionOverlayProps {
   elements: DiagramElement[];

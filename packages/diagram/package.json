@@ -1,6 +1,6 @@
 {
-  "name": "@packages/diagram",
-  "version": "1.0.0",
+  "name": "@scribblesvg/core",
+  "version": "0.1.0",
   "description": "Shared diagram types, validation, geometry, and rendering primitives",
   "type": "module",
   "exports": {

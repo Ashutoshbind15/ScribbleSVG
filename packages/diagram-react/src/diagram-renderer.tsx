@@ -5,7 +5,7 @@ import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   type DiagramDocument,
   type DiagramElement,
-} from "@packages/diagram";
+} from "@scribblesvg/core";
 import {
   resolveDiagramColors,
   type DiagramColorPreset,

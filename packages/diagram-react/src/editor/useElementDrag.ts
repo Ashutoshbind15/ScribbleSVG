@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import type { DiagramElement } from "@packages/diagram";
+import type { DiagramElement } from "@scribblesvg/core";
 import type { CanvasAction } from "./useCanvasReducer";
 import {
   applyElementPatches,

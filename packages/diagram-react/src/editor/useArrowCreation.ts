@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
-import type { DiagramElement, ArrowElement } from "@packages/diagram";
 import {
   generateSeed,
   getAnchorPoint,
   getElementCenter,
-} from "@packages/diagram";
+  type ArrowElement,
+  type DiagramElement,
+} from "@scribblesvg/core";
 import { hitTest, hitTestConnectionPoint } from "./hit-test";
 import type { CanvasAction } from "./useCanvasReducer";
 

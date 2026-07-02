@@ -1,10 +1,10 @@
 import { useReducer } from "react";
-import type {
-  DiagramDocument,
-  DiagramElement,
-  Viewport,
-} from "@packages/diagram";
-import { DEFAULT_VIEWPORT, EMPTY_DOCUMENT } from "@packages/diagram";
+import {
+  EMPTY_DOCUMENT,
+  type DiagramDocument,
+  type DiagramElement,
+  type Viewport,
+} from "@scribblesvg/core";
 
 // ── Tool types ──
 

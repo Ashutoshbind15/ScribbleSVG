@@ -1,4 +1,4 @@
-import type { Viewport } from "@packages/diagram";
+import type { Viewport } from "@scribblesvg/core";
 
 /**
  * Convert screen (pixel) coordinates to canvas (SVG) coordinates.

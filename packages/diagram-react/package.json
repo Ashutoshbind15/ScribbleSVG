@@ -1,6 +1,6 @@
 {
-  "name": "@packages/diagram-react",
-  "version": "1.0.0",
+  "name": "@scribblesvg/react-utils",
+  "version": "0.1.0",
   "description": "React components for diagram rendering and editing",
   "type": "module",
   "exports": {
@@ -20,7 +20,7 @@
     "react-dom": "19.2.4"
   },
   "dependencies": {
-    "@packages/diagram": "workspace:*",
+    "@scribblesvg/core": "workspace:*",
     "lucide-react": "1.7.0"
   },
   "devDependencies": {

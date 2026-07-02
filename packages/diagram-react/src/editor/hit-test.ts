@@ -1,9 +1,10 @@
-import type { DiagramElement, Bounds } from "@packages/diagram";
 import {
   getElementBounds,
   getElementCenter,
   getElementConnectionPoints,
-} from "@packages/diagram";
+  type Bounds,
+  type DiagramElement,
+} from "@scribblesvg/core";
 
 /**
  * Hit-test threshold for arrows (distance in canvas-space pixels).

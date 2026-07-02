@@ -1,0 +1,23 @@
+{
+  "name": "scribblesvg",
+  "private": "true",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --import tsx --test --test-reporter=spec tests/**/*.test.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.2",
+  "dependencies": {
+    "@scribblesvg/core": "workspace:*",
+    "@scribblesvg/react-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.1",
+    "tsx": "4.22.4",
+    "typescript": "6.0.2"
+  }
+}

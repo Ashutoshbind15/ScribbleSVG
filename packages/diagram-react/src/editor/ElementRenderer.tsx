@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import type { DiagramElement } from "@packages/diagram";
 import {
-  getElementRoughPaths,
-  getElementBounds,
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
-} from "@packages/diagram";
+  getElementBounds,
+  getElementRoughPaths,
+  type DiagramElement,
+} from "@scribblesvg/core";
 import { TextRenderer } from "./TextRenderer";
 
 interface ElementRendererProps {

@@ -1,6 +1,8 @@
 import { useMemo } from "react";
-import type { DiagramElement } from "@packages/diagram";
-import { getElementConnectionPoints } from "@packages/diagram";
+import {
+  getElementConnectionPoints,
+  type DiagramElement,
+} from "@scribblesvg/core";
 import type { ConnectionPointHit } from "./hit-test";
 
 interface ConnectionPointsProps {
