@@ -30,7 +30,7 @@ bun add @scribblesvg/core
 
 Diagrams are serializable JSON. Each shape carries a seed so its hand-drawn strokes stay consistent across sessions and renderers.
 
-For interactive editing and read-only display in React, see [@scribblesvg/react-utils](../react-utils).
+For interactive editing and read-only display in React, see [@scribblesvg/react-utils](https://github.com/Ashutoshbind15/ScribbleSVG/tree/main/packages/react-utils).
 
 ## License
 

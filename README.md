@@ -6,8 +6,8 @@ A lightweight, SVG-based toolkit for creating basic diagrams and sketches with a
 
 | Package | Description |
 | --- | --- |
-| **[@scribblesvg/core](packages/core)** | Diagram types, geometry, validation, and rendering primitives |
-| **[@scribblesvg/react-utils](packages/react-utils)** | React components for display and editing |
+| **[@scribblesvg/core](https://github.com/Ashutoshbind15/ScribbleSVG/tree/main/packages/core)** | Diagram types, geometry, validation, and rendering primitives |
+| **[@scribblesvg/react-utils](https://github.com/Ashutoshbind15/ScribbleSVG/tree/main/packages/react-utils)** | React components for display and editing |
 
 ## Canvas & renderer
 

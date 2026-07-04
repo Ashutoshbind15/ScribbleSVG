@@ -22,8 +22,7 @@
     "build": "tsc --project tsconfig.build.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run build",
-    "test": "pnpm --workspace-root run test:diagram",
-    "test:coverage": "pnpm --workspace-root run test:diagram:coverage",
+    "test": "pnpm --workspace-root run test",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "keywords": [

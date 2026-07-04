@@ -2,7 +2,7 @@
 
 React components for diagram display and editing with a hand-drawn scribble style.
 
-Part of [ScribbleSVG](https://github.com/Ashutoshbind15/ScribbleSVG). `DiagramCanvas` is the editor; `DiagramRenderer` draws a diagram as SVG. Both take a `DiagramDocument` from [@scribblesvg/core](../core).
+Part of [ScribbleSVG](https://github.com/Ashutoshbind15/ScribbleSVG). `DiagramCanvas` is the editor; `DiagramRenderer` draws a diagram as SVG. Both take a `DiagramDocument` from [@scribblesvg/core](https://github.com/Ashutoshbind15/ScribbleSVG/tree/main/packages/core).
 
 ## Install
 
