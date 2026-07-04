@@ -47,7 +47,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Ashutoshbind15/ScribbleSVG.git",
-    "directory": "packages/diagram-react"
+    "directory": "packages/react-utils"
   },
   "homepage": "https://github.com/Ashutoshbind15/ScribbleSVG#readme",
   "bugs": {

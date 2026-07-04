@@ -27,24 +27,24 @@ import {
   canvasToScreen,
   getViewBox,
   screenToCanvas,
-} from "../packages/diagram-react/src/editor/coordinate-utils.ts";
+} from "../packages/react-utils/src/editor/coordinate-utils.ts";
 import {
   getResizeHandles,
   hitTest,
   hitTestElement,
   hitTestResizeHandle,
   hitTestConnectionPoint,
-} from "../packages/diagram-react/src/editor/hit-test.ts";
+} from "../packages/react-utils/src/editor/hit-test.ts";
 import {
   canvasReducer,
   type CanvasState,
   type ToolType,
-} from "../packages/diagram-react/src/editor/useCanvasReducer.ts";
+} from "../packages/react-utils/src/editor/useCanvasReducer.ts";
 import {
   resolveDiagramColors,
   DIAGRAM_COLOR_PRESETS,
   DEFAULT_DIAGRAM_COLORS,
-} from "../packages/diagram-react/src/colors.ts";
+} from "../packages/react-utils/src/colors.ts";
 import {
   diagramSnapshot,
   parsePayload,

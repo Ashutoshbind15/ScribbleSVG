@@ -7,7 +7,17 @@ Part of [ScribbleSVG](https://github.com/Ashutoshbind15/ScribbleSVG). Use this p
 ## Install
 
 ```bash
+# Using npm
 npm install @scribblesvg/core
+
+# Using pnpm
+pnpm add @scribblesvg/core
+
+# Using yarn
+yarn add @scribblesvg/core
+
+# Using bun
+bun add @scribblesvg/core
 ```
 
 ## What's included
@@ -20,7 +30,7 @@ npm install @scribblesvg/core
 
 Diagrams are serializable JSON. Each shape carries a seed so its hand-drawn strokes stay consistent across sessions and renderers.
 
-For interactive editing and read-only display in React, see `[@scribblesvg/react-utils](../diagram-react)`.
+For interactive editing and read-only display in React, see [@scribblesvg/react-utils](../react-utils).
 
 ## License
 
