@@ -6,24 +6,30 @@
   "sideEffects": false,
   "exports": {
     "./renderer": {
-      "types": "./src/diagram-renderer.tsx",
-      "default": "./src/diagram-renderer.tsx"
+      "types": "./dist/diagram-renderer.d.ts",
+      "import": "./dist/diagram-renderer.js",
+      "default": "./dist/diagram-renderer.js"
     },
     "./colors": {
-      "types": "./src/colors.ts",
-      "default": "./src/colors.ts"
+      "types": "./dist/colors.d.ts",
+      "import": "./dist/colors.js",
+      "default": "./dist/colors.js"
     },
     "./editor": {
-      "types": "./src/editor/index.ts",
-      "default": "./src/editor/index.ts"
+      "types": "./dist/editor/index.d.ts",
+      "import": "./dist/editor/index.js",
+      "default": "./dist/editor/index.js"
     }
   },
   "files": [
-    "src",
+    "dist",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run build",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "keywords": [

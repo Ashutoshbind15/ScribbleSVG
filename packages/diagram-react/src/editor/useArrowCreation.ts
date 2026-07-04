@@ -9,7 +9,7 @@ import {
 import { hitTest, hitTestConnectionPoint } from "./hit-test";
 import type { CanvasAction } from "./useCanvasReducer";
 
-interface ArrowStartState {
+export interface ArrowStartState {
   /** Canvas-space position of the first click */
   point: { x: number; y: number };
   /** Element ID if the click landed on a shape, undefined if free-floating */
