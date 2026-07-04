@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
   getContentBounds,
   getElementBounds,
@@ -93,6 +94,8 @@ export type DiagramRendererProps = {
   /** Override individual colors on top of the preset. */
   colors?: Partial<DiagramColors>;
   className?: string;
+  style?: CSSProperties;
+  "aria-label"?: string;
 };
 
 export function DiagramRenderer({
@@ -100,6 +103,8 @@ export function DiagramRenderer({
   colorPreset,
   colors,
   className,
+  style,
+  "aria-label": ariaLabel,
 }: DiagramRendererProps) {
   const resolvedColors = resolveDiagramColors({ preset: colorPreset, colors });
   const contentBounds = getContentBounds(document.elements);
@@ -117,23 +122,22 @@ export function DiagramRenderer({
   const viewBoxHeight = Math.max(bounds.height + DIAGRAM_PADDING * 2, 1);
 
   return (
-    <div
-      className={[
-        "overflow-hidden rounded-lg border border-border bg-background p-4",
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
+    <svg
+      width="100%"
+      viewBox={`${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`}
+      preserveAspectRatio="xMidYMid meet"
+      role="img"
+      aria-label={ariaLabel ?? "Diagram"}
+      className={className}
+      style={{
+        display: "block",
+        height: "auto",
+        maxWidth: "100%",
+        aspectRatio: `${viewBoxWidth} / ${viewBoxHeight}`,
+        color: resolvedColors.text,
+        ...style,
+      }}
     >
-      <svg
-        width="100%"
-        viewBox={`${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`}
-        preserveAspectRatio="xMidYMid meet"
-        role="img"
-        aria-label="Diagram"
-        className="block h-auto w-full text-foreground"
-        style={{ aspectRatio: `${viewBoxWidth} / ${viewBoxHeight}` }}
-      >
         {document.elements.map((element) => {
           const bounds = getElementBounds(element);
           const paths = getElementRoughPaths(element);
@@ -166,7 +170,6 @@ export function DiagramRenderer({
             Empty diagram
           </text>
         ) : null}
-      </svg>
-    </div>
+    </svg>
   );
 }

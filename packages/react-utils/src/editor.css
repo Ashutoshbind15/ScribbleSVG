@@ -1,0 +1,148 @@
+.scribblesvg-editor {
+  --scribblesvg-bg: #fff;
+  --scribblesvg-fg: #0a0a0a;
+  --scribblesvg-border: #e5e5e5;
+  --scribblesvg-muted: #737373;
+  --scribblesvg-muted-bg: #f5f5f5;
+  --scribblesvg-accent: #171717;
+  --scribblesvg-accent-fg: #fafafa;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--scribblesvg-fg);
+}
+
+:where(.scribblesvg-editor) {
+  height: 100%;
+}
+
+.scribblesvg-editor__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--scribblesvg-border);
+  padding: 0.5rem 0.75rem;
+}
+
+.scribblesvg-editor__zoom {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--scribblesvg-muted);
+}
+
+.scribblesvg-editor__viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+  background: var(--scribblesvg-bg);
+}
+
+.scribblesvg-editor__svg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.scribblesvg-editor__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--scribblesvg-border);
+  border-radius: 0.5rem;
+  background: var(--scribblesvg-bg);
+  padding: 0.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.scribblesvg-editor__toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  background: transparent;
+  color: var(--scribblesvg-muted);
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.scribblesvg-editor__toolbar button:hover {
+  background: var(--scribblesvg-muted-bg);
+  color: var(--scribblesvg-fg);
+}
+
+.scribblesvg-editor__toolbar button[aria-pressed="true"] {
+  background: var(--scribblesvg-accent);
+  color: var(--scribblesvg-accent-fg);
+}
+
+.scribblesvg-editor__toolbar button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.scribblesvg-editor__font-popup {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--scribblesvg-border);
+  border-radius: 0.5rem;
+  background: var(--scribblesvg-bg);
+  padding: 0.25rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+.scribblesvg-editor__font-popup button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--scribblesvg-muted);
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.scribblesvg-editor__font-popup button:hover {
+  background: var(--scribblesvg-muted-bg);
+  color: var(--scribblesvg-fg);
+}
+
+.scribblesvg-editor__font-popup button svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.scribblesvg-editor__font-popup input {
+  width: 2.75rem;
+  height: 1.5rem;
+  border: 1px solid var(--scribblesvg-border);
+  border-radius: 0.25rem;
+  background: transparent;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--scribblesvg-fg);
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.scribblesvg-editor__font-popup input::-webkit-inner-spin-button,
+.scribblesvg-editor__font-popup input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}

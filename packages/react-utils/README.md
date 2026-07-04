@@ -26,17 +26,21 @@ Peer dependencies: React 18 or 19.
 
 Read-only SVG output. Pass a `DiagramDocument`, get the diagram.
 
+`DiagramRenderer` outputs a single `<svg>`. Wrap and style it in your own markup. Diagram colors are set via `colors` / `colorPreset`. No CSS import required.
+
 ```tsx
 import { DiagramRenderer } from "@scribblesvg/react-utils/renderer";
 import type { DiagramDocument } from "@scribblesvg/core";
 
 function Preview({ document }: { document: DiagramDocument }) {
   return (
-    <DiagramRenderer
-      document={document}
-      colorPreset="inherit"
-      className="max-w-full"
-    />
+    <article className="my-site-card">
+      <DiagramRenderer
+        document={document}
+        colors={{ stroke: "#111", text: "#111" }}
+        className="w-full"
+      />
+    </article>
   );
 }
 ```
@@ -45,9 +49,10 @@ Color presets: `inherit` (follows `currentColor`), `light`, `dark`, and `darkBlu
 
 ## DiagramCanvas
 
-Interactive editor: pan, zoom, shapes, arrows, resize, text.
+Interactive editor: pan, zoom, shapes, arrows, resize, text. Import the bundled CSS once in your CMS or admin app.
 
 ```tsx
+import "@scribblesvg/react-utils/editor.css";
 import { useState } from "react";
 import { DiagramCanvas } from "@scribblesvg/react-utils/editor";
 import { EMPTY_DOCUMENT, type DiagramDocument } from "@scribblesvg/core";
@@ -56,12 +61,28 @@ function Editor() {
   const [document, setDocument] = useState<DiagramDocument>(EMPTY_DOCUMENT);
 
   return (
-    <DiagramCanvas
-      initialDocument={document}
-      onChange={setDocument}
-    />
+    <div className="diagram-editor-panel">
+      <DiagramCanvas initialDocument={document} onChange={setDocument} />
+    </div>
   );
 }
+```
+
+The editor fills its container (`height: 100%`). Give it a bounded height with your own class - on a wrapper or on `DiagramCanvas` via `className`:
+
+```css
+/* main.css */
+.diagram-editor-panel {
+  height: 600px;
+}
+```
+
+```tsx
+<div className="diagram-editor-panel">
+  <DiagramCanvas onChange={save} />
+</div>
+
+<DiagramCanvas className="diagram-editor-panel" onChange={save} />
 ```
 
 Use `onChange` to keep the document in sync (e.g. save to your backend).
@@ -70,6 +91,7 @@ Use `onChange` to keep the document in sync (e.g. save to your backend).
 
 | Import | Contents |
 | --- | --- |
+| `@scribblesvg/react-utils/editor.css` | Built-in styles for `DiagramCanvas` (toolbar, layout, controls) |
 | `@scribblesvg/react-utils/renderer` | `DiagramRenderer`, color presets and helpers |
 | `@scribblesvg/react-utils/editor` | `DiagramCanvas`, toolbar, hooks, hit-testing, and lower-level building blocks |
 | `@scribblesvg/react-utils/colors` | `DiagramColors`, `resolveDiagramColors`, `DIAGRAM_COLOR_PRESETS` |

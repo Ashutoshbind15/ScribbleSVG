@@ -88,7 +88,7 @@ export function FontSizePopup({
 
   return (
     <div
-      className="absolute z-10 flex items-center gap-1 rounded-lg border bg-background p-1 shadow-md"
+      className="scribblesvg-editor__font-popup"
       style={{
         left: screenX,
         top: screenY,
@@ -102,16 +102,14 @@ export function FontSizePopup({
         type="button"
         title="Decrease font size"
         aria-label="Decrease font size"
-        className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         onClick={() => handleStep(-STEP)}
       >
-        <Minus className="h-3.5 w-3.5" />
+        <Minus />
       </button>
       <input
         type="number"
         title="Font size"
         aria-label="Font size"
-        className="h-6 w-11 rounded border bg-transparent text-center text-xs text-foreground outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         value={inputValue}
         min={MIN_FONT_SIZE}
         max={MAX_FONT_SIZE}
@@ -133,10 +131,9 @@ export function FontSizePopup({
         type="button"
         title="Increase font size"
         aria-label="Increase font size"
-        className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         onClick={() => handleStep(STEP)}
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus />
       </button>
     </div>
   );

@@ -1,5 +1,6 @@
 // Canvas components
 export { DiagramCanvas } from "./DiagramCanvas";
+export type { DiagramCanvasProps } from "./DiagramCanvas";
 export { Toolbar } from "./Toolbar";
 export { ElementRenderer } from "./ElementRenderer";
 export { GridBackground } from "./GridBackground";

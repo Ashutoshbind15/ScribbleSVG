@@ -24,11 +24,13 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 const ZOOM_SENSITIVITY = 0.001;
 
-interface DiagramCanvasProps {
+export interface DiagramCanvasProps {
   /** Initial document to render (e.g. loaded from DB) */
   initialDocument?: DiagramDocument;
   /** Called whenever the document changes (for parent state tracking) */
   onChange?: (document: DiagramDocument) => void;
+  /** Optional class on the editor root (e.g. for a fixed height). Requires editor.css. */
+  className?: string;
 }
 
 /**
@@ -38,6 +40,7 @@ interface DiagramCanvasProps {
 export function DiagramCanvas({
   initialDocument,
   onChange,
+  className,
 }: DiagramCanvasProps) {
   const [state, dispatch] = useCanvasReducer(initialDocument);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -203,29 +206,26 @@ export function DiagramCanvas({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 border-b px-3 py-2">
+    <div
+      className={["scribblesvg-editor", className].filter(Boolean).join(" ")}
+    >
+      <div className="scribblesvg-editor__header">
         <Toolbar
           activeTool={state.tool}
           onToolChange={(tool) => dispatch({ type: "SET_TOOL", tool })}
         />
-        <span className="ml-auto text-xs text-muted-foreground">
+        <span className="scribblesvg-editor__zoom">
           {Math.round(state.document.viewport.zoom * 100)}%
         </span>
       </div>
 
-      {/* Canvas container */}
-      <div
-        ref={containerRef}
-        className="relative flex-1 overflow-hidden bg-background"
-      >
+      <div ref={containerRef} className="scribblesvg-editor__viewport">
         <svg
           ref={svgRef}
           viewBox={viewBox}
           width={size.width}
           height={size.height}
-          className="absolute inset-0"
+          className="scribblesvg-editor__svg"
           style={{ cursor: getCursor() }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}

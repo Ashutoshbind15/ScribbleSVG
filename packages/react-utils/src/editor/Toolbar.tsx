@@ -31,29 +31,18 @@ const TOOLS: {
  */
 export function Toolbar({ activeTool, onToolChange }: ToolbarProps) {
   return (
-    <div className="flex items-center gap-1 rounded-lg border bg-background p-1 shadow-sm">
-      {TOOLS.map(({ type, label, Icon }) => {
-        const isActive = activeTool === type;
-        return (
-          <button
-            key={type}
-            type="button"
-            title={label}
-            onClick={() => onToolChange(type)}
-            className={`
-              inline-flex items-center justify-center rounded-md p-2 text-sm
-              transition-colors
-              ${
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }
-            `}
-          >
-            <Icon className="h-4 w-4" />
-          </button>
-        );
-      })}
+    <div className="scribblesvg-editor__toolbar">
+      {TOOLS.map(({ type, label, Icon }) => (
+        <button
+          key={type}
+          type="button"
+          title={label}
+          aria-pressed={activeTool === type}
+          onClick={() => onToolChange(type)}
+        >
+          <Icon />
+        </button>
+      ))}
     </div>
   );
 }
