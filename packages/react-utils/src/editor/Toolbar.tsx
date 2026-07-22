@@ -3,6 +3,7 @@ import {
   Square,
   Circle,
   Cylinder,
+  Image,
   Type,
   ArrowUpRight,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const TOOLS: {
   { type: "rectangle", label: "Rectangle", Icon: Square },
   { type: "circle", label: "Circle", Icon: Circle },
   { type: "cylinder", label: "Cylinder", Icon: Cylinder },
+  { type: "icon", label: "Icon", Icon: Image },
   { type: "text", label: "Text", Icon: Type },
   { type: "arrow", label: "Arrow", Icon: ArrowUpRight },
 ];

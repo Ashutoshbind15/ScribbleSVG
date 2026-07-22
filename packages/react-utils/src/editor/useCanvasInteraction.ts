@@ -8,6 +8,7 @@ import {
   type CylinderElement,
   type DiagramDocument,
   type DiagramElement,
+  type IconElement,
   type RectangleElement,
   type TextElement,
   type Viewport,
@@ -25,6 +26,9 @@ import type { EditingTarget } from "./InlineTextEditor";
 const DEFAULT_RECT_SIZE = { width: 150, height: 80 };
 const DEFAULT_CIRCLE_RADIUS = 50;
 const DEFAULT_CYLINDER_SIZE = { width: 100, height: 120 };
+const DEFAULT_ICON_SIZE = { width: 150, height: 80 };
+/** Default opaque iconId for icons placed via the built-in toolbar tool. */
+const DEFAULT_ICON_ID = "custom";
 
 /** Handle half-size in canvas-space pixels */
 const HANDLE_SIZE = 5;
@@ -40,7 +44,7 @@ type InteractionMode =
   | "creating"; // click-drag to define size
 
 interface CreationState {
-  type: "rectangle" | "circle" | "cylinder";
+  type: "rectangle" | "circle" | "cylinder" | "icon";
   startPoint: { x: number; y: number };
   elementId: string;
   seed: number;
@@ -202,7 +206,8 @@ export function useCanvasInteraction(
     } else if (
       element.type === "rectangle" ||
       element.type === "circle" ||
-      element.type === "cylinder"
+      element.type === "cylinder" ||
+      element.type === "icon"
     ) {
       const bounds = getElementBounds(element);
       const currentText = "text" in element && element.text ? element.text : "";
@@ -377,8 +382,13 @@ export function useCanvasInteraction(
         return;
       }
 
-      // Creation tools: rectangle, circle, cylinder
-      if (tool === "rectangle" || tool === "circle" || tool === "cylinder") {
+      // Creation tools: rectangle, circle, cylinder, icon
+      if (
+        tool === "rectangle" ||
+        tool === "circle" ||
+        tool === "cylinder" ||
+        tool === "icon"
+      ) {
         e.preventDefault();
         const elementId = crypto.randomUUID();
         const seed = generateSeed();
@@ -393,7 +403,7 @@ export function useCanvasInteraction(
             y: canvasPoint.y,
             width: DEFAULT_RECT_SIZE.width,
             height: DEFAULT_RECT_SIZE.height,
-          };
+          } satisfies RectangleElement;
         } else if (tool === "circle") {
           element = {
             id: elementId,
@@ -402,8 +412,8 @@ export function useCanvasInteraction(
             cx: canvasPoint.x,
             cy: canvasPoint.y,
             radius: DEFAULT_CIRCLE_RADIUS,
-          };
-        } else {
+          } satisfies CircleElement;
+        } else if (tool === "cylinder") {
           element = {
             id: elementId,
             type: "cylinder",
@@ -412,7 +422,18 @@ export function useCanvasInteraction(
             y: canvasPoint.y,
             width: DEFAULT_CYLINDER_SIZE.width,
             height: DEFAULT_CYLINDER_SIZE.height,
-          };
+          } satisfies CylinderElement;
+        } else {
+          element = {
+            id: elementId,
+            type: "icon",
+            seed,
+            iconId: DEFAULT_ICON_ID,
+            x: canvasPoint.x,
+            y: canvasPoint.y,
+            width: DEFAULT_ICON_SIZE.width,
+            height: DEFAULT_ICON_SIZE.height,
+          } satisfies IconElement;
         }
 
         // Start creation drag
@@ -595,7 +616,11 @@ export function useCanvasInteraction(
 
         // Update element size based on drag
         let patch: Partial<DiagramElement> = {};
-        if (creation.type === "rectangle" || creation.type === "cylinder") {
+        if (
+          creation.type === "rectangle" ||
+          creation.type === "cylinder" ||
+          creation.type === "icon"
+        ) {
           const x = dx >= 0 ? creation.startPoint.x : canvasPoint.x;
           const y = dy >= 0 ? creation.startPoint.y : canvasPoint.y;
           const width = Math.max(20, Math.abs(dx));

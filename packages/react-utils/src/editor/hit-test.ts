@@ -40,13 +40,12 @@ export function hitTestElement(
   switch (element.type) {
     case "rectangle":
     case "cylinder":
+    case "icon":
+    case "text":
       return pointInRect(point, getElementBounds(element));
 
     case "circle":
       return pointInCircle(point, element.cx, element.cy, element.radius);
-
-    case "text":
-      return pointInRect(point, getElementBounds(element));
 
     case "arrow":
       return pointNearLineSegment(

@@ -19,6 +19,7 @@ import {
   type CylinderElement,
   type DiagramDocument,
   type DiagramElement,
+  type IconElement,
   type RectangleElement,
   type TextElement,
   type Viewport,
@@ -104,6 +105,20 @@ function createCylinder(
   };
 }
 
+function createIcon(overrides: Partial<IconElement> = {}): IconElement {
+  return {
+    id: "icon-1",
+    type: "icon",
+    seed: 33,
+    iconId: "custom",
+    x: 10,
+    y: 20,
+    width: 100,
+    height: 50,
+    ...overrides,
+  };
+}
+
 function createText(overrides: Partial<TextElement> = {}): TextElement {
   return {
     id: "text-1",
@@ -170,6 +185,7 @@ describe("@scribblesvg/core", () => {
       createRectangle({ text: "Box" }),
       createCircle({ text: "Circle" }),
       createCylinder({ text: "Cylinder" }),
+      createIcon({ text: "Icon", iconId: "iconpack:iconname" }),
       createText({ text: "Hello World", fontSize: 16 }),
       createArrow({ startBinding: "rect-1", endBinding: "circle-1" }),
     ]);
@@ -179,12 +195,14 @@ describe("@scribblesvg/core", () => {
     const parsed = parseDiagramDocument(document);
     assert.equal(parsed.version, 1);
     assert.equal(parsed.viewport.zoom, 1);
-    assert.equal(parsed.elements.length, 5);
+    assert.equal(parsed.elements.length, 6);
     assert.equal(parsed.elements[0]?.type, "rectangle");
-    assert.equal(parsed.elements[3]?.type, "text");
-    assert.equal(parsed.elements[4]?.type, "arrow");
-    assert.equal((parsed.elements[4] as ArrowElement).startBinding, "rect-1");
-    assert.equal((parsed.elements[4] as ArrowElement).endBinding, "circle-1");
+    assert.equal(parsed.elements[3]?.type, "icon");
+    assert.equal((parsed.elements[3] as IconElement).iconId, "iconpack:iconname");
+    assert.equal(parsed.elements[4]?.type, "text");
+    assert.equal(parsed.elements[5]?.type, "arrow");
+    assert.equal((parsed.elements[5] as ArrowElement).startBinding, "rect-1");
+    assert.equal((parsed.elements[5] as ArrowElement).endBinding, "circle-1");
   });
 
   test("rejects invalid diagram documents", () => {
@@ -201,11 +219,31 @@ describe("@scribblesvg/core", () => {
         elements: [{ id: "bad", type: "unknown", seed: 1 }],
       }),
     );
+    assert.throws(() =>
+      parseDiagramDocument({
+        version: 1,
+        viewport: { x: 0, y: 0, zoom: 1 },
+        elements: [
+          {
+            id: "icon-bad",
+            type: "icon",
+            seed: 1,
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+          },
+        ],
+      }),
+    );
   });
 
   test("calculates element bounds for every geometry type", () => {
     const rectangleBounds = getElementBounds(createRectangle());
     assert.deepEqual(rectangleBounds, { x: 10, y: 20, width: 100, height: 50 });
+
+    const iconBounds = getElementBounds(createIcon());
+    assert.deepEqual(iconBounds, rectangleBounds);
 
     const circleBounds = getElementBounds(createCircle());
     assert.deepEqual(circleBounds, { x: 160, y: 160, width: 80, height: 80 });
@@ -281,6 +319,7 @@ describe("@scribblesvg/core", () => {
 
   test("computes centers for shapes, text, and arrows", () => {
     assert.deepEqual(getElementCenter(createRectangle()), { x: 60, y: 45 });
+    assert.deepEqual(getElementCenter(createIcon()), { x: 60, y: 45 });
     assert.deepEqual(getElementCenter(createCircle()), { x: 200, y: 200 });
     assert.deepEqual(
       getElementCenter(
@@ -304,6 +343,11 @@ describe("@scribblesvg/core", () => {
     const anchorRight = getAnchorPoint(rectangle, { x: 200, y: 45 });
     assertClose(anchorRight.x, 110, "rectangle right edge x");
     assertClose(anchorRight.y, 45, "rectangle right edge y");
+
+    const icon = createIcon();
+    const iconAnchorRight = getAnchorPoint(icon, { x: 200, y: 45 });
+    assertClose(iconAnchorRight.x, 110, "icon right edge x");
+    assertClose(iconAnchorRight.y, 45, "icon right edge y");
 
     const anchorTop = getAnchorPoint(rectangle, { x: 60, y: -100 });
     assertClose(anchorTop.x, 60, "rectangle top edge x");
@@ -348,6 +392,9 @@ describe("@scribblesvg/core", () => {
     assert.deepEqual(rectPoints[1], { x: 60, y: 20 });
     assert.deepEqual(rectPoints[3], { x: 110, y: 45 });
 
+    const iconPoints = getElementConnectionPoints(createIcon());
+    assert.deepEqual(iconPoints, rectPoints);
+
     const circle = createCircle();
     const circlePoints = getElementConnectionPoints(circle);
     assert.equal(circlePoints.length, 8);
@@ -368,6 +415,7 @@ describe("@scribblesvg/core", () => {
       createRectangle(),
       createCircle(),
       createCylinder(),
+      createIcon(),
       createArrow(),
     ];
 
@@ -393,6 +441,10 @@ describe("@scribblesvg/core", () => {
     const secondPaths = getElementRoughPaths(element);
 
     assert.deepEqual(firstPaths, secondPaths);
+    assert.deepEqual(
+      getElementRoughPaths(createIcon({ seed: 7 })),
+      getElementRoughPaths(createRectangle({ seed: 7 })),
+    );
     assert.ok(getElementRoughPaths(createArrow()).length >= 3);
   });
 });
@@ -575,6 +627,7 @@ describe("canvas reducer", () => {
       "rectangle",
       "circle",
       "cylinder",
+      "icon",
       "text",
       "arrow",
     ];
@@ -711,10 +764,14 @@ describe("canvas reducer", () => {
 });
 
 describe("canvas hit testing", () => {
-  test("hit tests rectangles, circles, cylinders, and text", () => {
+  test("hit tests rectangles, circles, cylinders, icons, and text", () => {
     const rectangle = createRectangle();
     assert.equal(hitTestElement({ x: 60, y: 45 }, rectangle), true);
     assert.equal(hitTestElement({ x: 5, y: 45 }, rectangle), false);
+
+    const icon = createIcon();
+    assert.equal(hitTestElement({ x: 60, y: 45 }, icon), true);
+    assert.equal(hitTestElement({ x: 5, y: 45 }, icon), false);
 
     const circle = createCircle({ cx: 100, cy: 100, radius: 50 });
     assert.equal(hitTestElement({ x: 100, y: 100 }, circle), true);

@@ -162,7 +162,8 @@ function boundsToElementPatch(
 ): Partial<DiagramElement> | null {
   switch (original.type) {
     case "rectangle":
-    case "cylinder": {
+    case "cylinder":
+    case "icon": {
       const patch: Partial<DiagramElement> = {
         x: bounds.x,
         y: bounds.y,

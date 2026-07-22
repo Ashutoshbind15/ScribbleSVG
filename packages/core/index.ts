@@ -5,6 +5,7 @@ export type {
   RectangleElement,
   CircleElement,
   CylinderElement,
+  IconElement,
   TextElement,
   ArrowElement,
   DiagramElement,

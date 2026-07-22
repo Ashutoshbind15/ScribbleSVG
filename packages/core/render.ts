@@ -4,6 +4,7 @@ import type {
   RectangleElement,
   CircleElement,
   CylinderElement,
+  IconElement,
   ArrowElement,
 } from "./types";
 
@@ -37,6 +38,7 @@ const generator = rough.generator();
 export function getElementRoughPaths(element: DiagramElement): RoughPathData[] {
   switch (element.type) {
     case "rectangle":
+    case "icon":
       return getRectanglePaths(element);
     case "circle":
       return getCirclePaths(element);
@@ -51,7 +53,9 @@ export function getElementRoughPaths(element: DiagramElement): RoughPathData[] {
 
 // ── Element renderers ──
 
-function getRectanglePaths(el: RectangleElement): RoughPathData[] {
+function getRectanglePaths(
+  el: RectangleElement | IconElement,
+): RoughPathData[] {
   const drawable = generator.rectangle(el.x, el.y, el.width, el.height, {
     seed: el.seed,
   });

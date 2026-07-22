@@ -38,6 +38,19 @@ const CylinderElementSchema = z.object({
   fontSize: z.number().optional(),
 });
 
+const IconElementSchema = z.object({
+  id: z.string(),
+  type: z.literal("icon"),
+  seed: z.number(),
+  iconId: z.string(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  text: z.string().optional(),
+  fontSize: z.number().optional(),
+});
+
 const TextElementSchema = z.object({
   id: z.string(),
   type: z.literal("text"),
@@ -66,6 +79,7 @@ const DiagramElementSchema = z.discriminatedUnion("type", [
   RectangleElementSchema,
   CircleElementSchema,
   CylinderElementSchema,
+  IconElementSchema,
   TextElementSchema,
   ArrowElementSchema,
 ]);

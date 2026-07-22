@@ -13,6 +13,7 @@ export type ToolType =
   | "rectangle"
   | "circle"
   | "cylinder"
+  | "icon"
   | "text"
   | "arrow";
 

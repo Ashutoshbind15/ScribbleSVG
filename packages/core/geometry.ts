@@ -3,6 +3,7 @@ import type {
   RectangleElement,
   CircleElement,
   CylinderElement,
+  IconElement,
   TextElement,
 } from "./types";
 import { DEFAULT_TEXT_FONT_SIZE } from "./constants";
@@ -22,6 +23,8 @@ export interface Bounds {
 export function getElementBounds(el: DiagramElement): Bounds {
   switch (el.type) {
     case "rectangle":
+    case "cylinder":
+    case "icon":
       return { x: el.x, y: el.y, width: el.width, height: el.height };
 
     case "circle":
@@ -31,9 +34,6 @@ export function getElementBounds(el: DiagramElement): Bounds {
         width: el.radius * 2,
         height: el.radius * 2,
       };
-
-    case "cylinder":
-      return { x: el.x, y: el.y, width: el.width, height: el.height };
 
     case "text": {
       if (el.width != null && el.height != null) {
@@ -139,7 +139,12 @@ export function getElementConnectionPoints(
 }
 
 export function getAnchorPoint(
-  element: RectangleElement | CircleElement | CylinderElement | TextElement,
+  element:
+    | RectangleElement
+    | CircleElement
+    | CylinderElement
+    | IconElement
+    | TextElement,
   from: { x: number; y: number },
 ): { x: number; y: number } {
   const center = getElementCenter(element);
@@ -157,7 +162,7 @@ export function getAnchorPoint(
     };
   }
 
-  // Rectangle, cylinder, or text: intersect line from center→from with bounding box
+  // Rectangle, cylinder, icon, or text: intersect line from center→from with bounding box
   const bounds = getElementBounds(element);
   return lineRectIntersection(center, from, bounds);
 }

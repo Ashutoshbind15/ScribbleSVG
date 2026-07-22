@@ -4,6 +4,7 @@ export type ElementType =
   | "rectangle"
   | "circle"
   | "cylinder"
+  | "icon"
   | "text"
   | "arrow";
 
@@ -45,6 +46,19 @@ export interface CylinderElement extends BaseElement {
   fontSize?: number; // default 14
 }
 
+/** Extensible icon; rendered as a rectangle until custom SVG resolution exists. */
+export interface IconElement extends BaseElement {
+  type: "icon";
+  /** Opaque consumer key for later SVG resolution (e.g. "iconpack:icon-name"). */
+  iconId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text?: string;
+  fontSize?: number; // default 14
+}
+
 // Standalone text element
 
 export interface TextElement extends BaseElement {
@@ -76,6 +90,7 @@ export type DiagramElement =
   | RectangleElement
   | CircleElement
   | CylinderElement
+  | IconElement
   | TextElement
   | ArrowElement;
 
