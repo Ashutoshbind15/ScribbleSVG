@@ -13,9 +13,11 @@ export type ToolType =
   | "rectangle"
   | "circle"
   | "cylinder"
+  | "diamond"
   | "icon"
   | "text"
-  | "arrow";
+  | "arrow"
+  | "line";
 
 // ── Canvas state ──
 

@@ -1,6 +1,6 @@
 {
   "name": "@scribblesvg/core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Diagram types, geometry, validation, and SVG rendering primitives with a hand-drawn scribble style",
   "type": "module",
   "sideEffects": false,

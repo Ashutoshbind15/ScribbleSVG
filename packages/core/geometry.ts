@@ -1,11 +1,9 @@
 import type {
+  BindableElement,
   DiagramElement,
-  RectangleElement,
-  CircleElement,
-  CylinderElement,
-  IconElement,
-  TextElement,
+  DiamondElement,
 } from "./types";
+import { isConnector } from "./types";
 import { DEFAULT_TEXT_FONT_SIZE } from "./constants";
 
 // ── Bounding boxes ──
@@ -17,6 +15,24 @@ export interface Bounds {
   height: number;
 }
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * Four vertices of a diamond (N, E, S, W) from its circumscribing AABB.
+ */
+export function getDiamondVertices(bounds: Bounds): [Point, Point, Point, Point] {
+  const { x, y, width, height } = bounds;
+  return [
+    { x: x + width / 2, y },
+    { x: x + width, y: y + height / 2 },
+    { x: x + width / 2, y: y + height },
+    { x, y: y + height / 2 },
+  ];
+}
+
 /**
  * Bounding box of a single element.
  */
@@ -24,6 +40,7 @@ export function getElementBounds(el: DiagramElement): Bounds {
   switch (el.type) {
     case "rectangle":
     case "cylinder":
+    case "diamond":
     case "icon":
       return { x: el.x, y: el.y, width: el.width, height: el.height };
 
@@ -50,7 +67,8 @@ export function getElementBounds(el: DiagramElement): Bounds {
       return { x: el.x, y: el.y, width, height };
     }
 
-    case "arrow": {
+    case "arrow":
+    case "line": {
       const minX = Math.min(el.startX, el.endX);
       const minY = Math.min(el.startY, el.endY);
       const maxX = Math.max(el.startX, el.endX);
@@ -104,11 +122,11 @@ export interface ConnectionPoint {
   y: number;
 }
 
-/** Eight snap points per shape (edge midpoints + corners, or compass points on circles). */
+/** Connection snap points per bindable shape. */
 export function getElementConnectionPoints(
   element: DiagramElement,
 ): ConnectionPoint[] {
-  if (element.type === "arrow") return [];
+  if (isConnector(element)) return [];
 
   if (element.type === "circle") {
     const { cx, cy, radius } = element;
@@ -120,6 +138,10 @@ export function getElementConnectionPoints(
         y: cy - radius * Math.cos(rad),
       };
     });
+  }
+
+  if (element.type === "diamond") {
+    return [...getDiamondVertices(getElementBounds(element))];
   }
 
   const { x, y, width, height } = getElementBounds(element);
@@ -139,12 +161,7 @@ export function getElementConnectionPoints(
 }
 
 export function getAnchorPoint(
-  element:
-    | RectangleElement
-    | CircleElement
-    | CylinderElement
-    | IconElement
-    | TextElement,
+  element: BindableElement,
   from: { x: number; y: number },
 ): { x: number; y: number } {
   const center = getElementCenter(element);
@@ -160,6 +177,10 @@ export function getAnchorPoint(
       x: center.x + (dx / dist) * element.radius,
       y: center.y + (dy / dist) * element.radius,
     };
+  }
+
+  if (element.type === "diamond") {
+    return lineDiamondIntersection(center, from, element);
   }
 
   // Rectangle, cylinder, icon, or text: intersect line from center→from with bounding box
@@ -229,6 +250,54 @@ function lineRectIntersection(
 
   if (tMin === Infinity) {
     // Degenerate case (inside === outside), return center
+    return inside;
+  }
+
+  return {
+    x: inside.x + tMin * dx,
+    y: inside.y + tMin * dy,
+  };
+}
+
+/**
+ * Ray from diamond center toward `outside` ∩ diamond edges.
+ */
+function lineDiamondIntersection(
+  inside: { x: number; y: number },
+  outside: { x: number; y: number },
+  diamond: DiamondElement,
+): { x: number; y: number } {
+  const vertices = getDiamondVertices(getElementBounds(diamond));
+  const dx = outside.x - inside.x;
+  const dy = outside.y - inside.y;
+
+  if (dx === 0 && dy === 0) {
+    return inside;
+  }
+
+  let tMin = Infinity;
+
+  for (let i = 0; i < 4; i++) {
+    const a = vertices[i]!;
+    const b = vertices[(i + 1) % 4]!;
+    const edgeDx = b.x - a.x;
+    const edgeDy = b.y - a.y;
+
+    // Solve inside + t * dir = a + u * edge, t in (0,1], u in [0,1]
+    const denom = dx * edgeDy - dy * edgeDx;
+    if (Math.abs(denom) < 1e-10) continue;
+
+    const ox = a.x - inside.x;
+    const oy = a.y - inside.y;
+    const t = (ox * edgeDy - oy * edgeDx) / denom;
+    const u = (ox * dy - oy * dx) / denom;
+
+    if (t > 0 && t <= 1 && u >= 0 && u <= 1) {
+      tMin = Math.min(tMin, t);
+    }
+  }
+
+  if (tMin === Infinity) {
     return inside;
   }
 

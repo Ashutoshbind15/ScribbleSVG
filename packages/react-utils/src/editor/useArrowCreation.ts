@@ -3,11 +3,15 @@ import {
   generateSeed,
   getAnchorPoint,
   getElementCenter,
+  isBindable,
   type ArrowElement,
   type DiagramElement,
+  type LineElement,
 } from "@scribblesvg/core";
 import { hitTest, hitTestConnectionPoint } from "./hit-test";
 import type { CanvasAction } from "./useCanvasReducer";
+
+export type ConnectorKind = "arrow" | "line";
 
 export interface ArrowStartState {
   /** Canvas-space position of the first click */
@@ -17,13 +21,13 @@ export interface ArrowStartState {
 }
 
 /**
- * Hook for two-click arrow creation.
+ * Hook for two-click arrow/line creation.
  *
- * Arrow tool flow:
+ * Connector tool flow:
  * 1. First click sets start point (optionally bound to an element)
  * 2. Mouse move shows a preview line from start to cursor
  * 3. Second click sets end point (optionally bound to an element)
- * 4. Arrow element is created and tool switches to select
+ * 4. Connector element is created and tool switches to select
  */
 export function useArrowCreation(
   elements: DiagramElement[],
@@ -34,16 +38,16 @@ export function useArrowCreation(
     null,
   );
 
-  const createArrow = useCallback(
+  const createConnector = useCallback(
     (
+      kind: ConnectorKind,
       startPoint: { x: number; y: number },
       endPoint: { x: number; y: number },
       startBinding?: string,
       endBinding?: string,
     ) => {
-      const arrow: ArrowElement = {
+      const base = {
         id: crypto.randomUUID(),
-        type: "arrow",
         seed: generateSeed(),
         startX: startPoint.x,
         startY: startPoint.y,
@@ -53,9 +57,14 @@ export function useArrowCreation(
         endBinding,
       };
 
-      dispatch({ type: "ADD_ELEMENT", element: arrow });
+      const element: ArrowElement | LineElement =
+        kind === "arrow"
+          ? { ...base, type: "arrow" }
+          : { ...base, type: "line" };
+
+      dispatch({ type: "ADD_ELEMENT", element });
       dispatch({ type: "SET_TOOL", tool: "select" });
-      dispatch({ type: "SET_SELECTION", ids: [arrow.id] });
+      dispatch({ type: "SET_SELECTION", ids: [element.id] });
 
       setArrowStart(null);
       setPreviewEnd(null);
@@ -72,14 +81,15 @@ export function useArrowCreation(
       if (!startState.binding) return startState.point;
 
       const startTarget = elements.find((e) => e.id === startState.binding);
-      if (!startTarget || startTarget.type === "arrow") return startState.point;
+      if (!startTarget || !isBindable(startTarget)) return startState.point;
 
       const endTarget = endBinding
         ? elements.find((e) => e.id === endBinding)
         : null;
-      const anchorFrom = endTarget
-        ? getElementCenter(endTarget)
-        : endRef;
+      const anchorFrom =
+        endTarget && isBindable(endTarget)
+          ? getElementCenter(endTarget)
+          : endRef;
 
       return getAnchorPoint(startTarget, anchorFrom);
     },
@@ -88,6 +98,7 @@ export function useArrowCreation(
 
   const handleArrowPointClick = useCallback(
     (
+      kind: ConnectorKind,
       point: { x: number; y: number },
       binding?: string,
     ) => {
@@ -97,13 +108,23 @@ export function useArrowCreation(
         return;
       }
 
-      createArrow(arrowStart.point, point, arrowStart.binding, binding);
+      createConnector(
+        kind,
+        arrowStart.point,
+        point,
+        arrowStart.binding,
+        binding,
+      );
     },
-    [arrowStart, createArrow],
+    [arrowStart, createConnector],
   );
 
   const handleArrowClick = useCallback(
-    (canvasPoint: { x: number; y: number }, snapThreshold?: number) => {
+    (
+      kind: ConnectorKind,
+      canvasPoint: { x: number; y: number },
+      snapThreshold?: number,
+    ) => {
       if (snapThreshold != null) {
         const connHit = hitTestConnectionPoint(
           canvasPoint,
@@ -111,21 +132,21 @@ export function useArrowCreation(
           snapThreshold,
         );
         if (connHit) {
-          handleArrowPointClick(connHit.point, connHit.elementId);
+          handleArrowPointClick(kind, connHit.point, connHit.elementId);
           return;
         }
       }
 
       const hitElement = hitTest(canvasPoint, elements);
       const bindableHit =
-        hitElement && hitElement.type !== "arrow" ? hitElement : null;
+        hitElement && isBindable(hitElement) ? hitElement : null;
 
       if (!arrowStart) {
         const startPoint = bindableHit
           ? getAnchorPoint(bindableHit, canvasPoint)
           : canvasPoint;
 
-        handleArrowPointClick(startPoint, bindableHit?.id);
+        handleArrowPointClick(kind, startPoint, bindableHit?.id);
       } else {
         const endPoint = bindableHit
           ? getAnchorPoint(bindableHit, arrowStart.point)
@@ -136,7 +157,8 @@ export function useArrowCreation(
           bindableHit?.id,
         );
 
-        createArrow(
+        createConnector(
+          kind,
           startPoint,
           endPoint,
           arrowStart.binding,
@@ -144,7 +166,7 @@ export function useArrowCreation(
         );
       }
     },
-    [arrowStart, elements, handleArrowPointClick, resolveStartPoint, createArrow],
+    [arrowStart, elements, handleArrowPointClick, resolveStartPoint, createConnector],
   );
 
   const updatePreview = useCallback(
@@ -165,7 +187,7 @@ export function useArrowCreation(
 
       const hitElement = hitTest(canvasPoint, elements);
       const bindableHit =
-        hitElement && hitElement.type !== "arrow" ? hitElement : null;
+        hitElement && isBindable(hitElement) ? hitElement : null;
 
       if (bindableHit) {
         setPreviewEnd(getAnchorPoint(bindableHit, arrowStart.point));

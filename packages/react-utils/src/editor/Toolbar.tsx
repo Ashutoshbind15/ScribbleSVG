@@ -3,6 +3,8 @@ import {
   Square,
   Circle,
   Cylinder,
+  Diamond,
+  Minus,
   Type,
   ArrowUpRight,
 } from "lucide-react";
@@ -26,7 +28,9 @@ const BUILTIN_TOOLS: {
   { type: "rectangle", label: "Rectangle", Icon: Square },
   { type: "circle", label: "Circle", Icon: Circle },
   { type: "cylinder", label: "Cylinder", Icon: Cylinder },
+  { type: "diamond", label: "Diamond", Icon: Diamond },
   { type: "text", label: "Text", Icon: Type },
+  { type: "line", label: "Line", Icon: Minus },
   { type: "arrow", label: "Arrow", Icon: ArrowUpRight },
 ];
 
@@ -40,8 +44,9 @@ export function Toolbar({
   catalogIcons = [],
   onToolChange,
 }: ToolbarProps) {
-  const beforeText = BUILTIN_TOOLS.slice(0, 4);
-  const afterShapes = BUILTIN_TOOLS.slice(4);
+  // Shapes before catalog icons; text + connectors after
+  const beforeText = BUILTIN_TOOLS.slice(0, 5);
+  const afterShapes = BUILTIN_TOOLS.slice(5);
 
   return (
     <div className="scribblesvg-editor__toolbar">

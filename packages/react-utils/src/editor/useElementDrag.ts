@@ -37,6 +37,7 @@ export function useElementDrag(
         switch (el.type) {
           case "rectangle":
           case "cylinder":
+          case "diamond":
           case "icon":
           case "text":
             startPositions.set(id, { x: el.x, y: el.y });
@@ -45,6 +46,7 @@ export function useElementDrag(
             startPositions.set(id, { cx: el.cx, cy: el.cy });
             break;
           case "arrow":
+          case "line":
             startPositions.set(id, {
               startX: el.startX,
               startY: el.startY,
@@ -84,6 +86,7 @@ export function useElementDrag(
         switch (el.type) {
           case "rectangle":
           case "cylinder":
+          case "diamond":
           case "icon":
           case "text":
             updates.push({
@@ -98,6 +101,7 @@ export function useElementDrag(
             });
             break;
           case "arrow":
+          case "line":
             updates.push({
               id,
               patch: {

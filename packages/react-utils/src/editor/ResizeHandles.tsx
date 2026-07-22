@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import { getElementBounds, type DiagramElement } from "@scribblesvg/core";
+import {
+  getElementBounds,
+  isConnector,
+  type DiagramElement,
+} from "@scribblesvg/core";
 import { getResizeHandles } from "./hit-test";
 import type { HandlePosition } from "./hit-test";
 
@@ -32,8 +36,8 @@ export function ResizeHandles({
   const bounds = useMemo(() => getElementBounds(element), [element]);
   const handles = useMemo(() => getResizeHandles(bounds), [bounds]);
 
-  // Arrows are resized by dragging endpoints, not handles
-  if (element.type === "arrow") return null;
+  // Connectors aren't resized via box handles
+  if (isConnector(element)) return null;
 
   return (
     <g className="resize-handles">

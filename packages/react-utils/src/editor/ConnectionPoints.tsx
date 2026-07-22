@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   getElementConnectionPoints,
+  isBindable,
   type DiagramElement,
 } from "@scribblesvg/core";
 import type { ConnectionPointHit } from "./hit-test";
@@ -28,7 +29,7 @@ function pointsEqual(
 }
 
 /**
- * Renders snap points on bindable elements while the arrow tool is active.
+ * Renders snap points on bindable elements while a connector tool is active.
  */
 export function ConnectionPoints({
   elements,
@@ -38,7 +39,7 @@ export function ConnectionPoints({
   onPointerDown,
 }: ConnectionPointsProps) {
   const bindableElements = useMemo(
-    () => elements.filter((el) => el.type !== "arrow"),
+    () => elements.filter(isBindable),
     [elements],
   );
 

@@ -5,13 +5,18 @@ export type {
   RectangleElement,
   CircleElement,
   CylinderElement,
+  DiamondElement,
   IconElement,
   TextElement,
   ArrowElement,
+  LineElement,
+  ConnectorElement,
+  BindableElement,
   DiagramElement,
   Viewport,
   DiagramDocument,
 } from "./types";
+export { isConnector, isBindable } from "./types";
 
 // Validation
 export { parseDiagramDocument, isDiagramDocument } from "./validation";
@@ -19,6 +24,7 @@ export { parseDiagramDocument, isDiagramDocument } from "./validation";
 // Geometry
 export type { Bounds, ConnectionPoint } from "./geometry";
 export {
+  getDiamondVertices,
   getElementBounds,
   getContentBounds,
   getElementCenter,

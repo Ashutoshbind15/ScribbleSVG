@@ -46,3 +46,4 @@ export { useCanvasInteraction } from "./useCanvasInteraction";
 export { useElementDrag } from "./useElementDrag";
 export { useElementResize } from "./useElementResize";
 export { useArrowCreation } from "./useArrowCreation";
+export type { ConnectorKind, ArrowStartState } from "./useArrowCreation";

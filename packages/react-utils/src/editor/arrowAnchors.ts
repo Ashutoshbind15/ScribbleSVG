@@ -2,6 +2,8 @@ import type { Dispatch } from "react";
 import {
   getAnchorPoint,
   getElementCenter,
+  isBindable,
+  isConnector,
   type DiagramElement,
 } from "@scribblesvg/core";
 import type { CanvasAction } from "./useCanvasReducer";
@@ -18,7 +20,7 @@ export function applyElementPatches(
 }
 
 /**
- * Compute anchor updates for arrows bound to the given elements.
+ * Compute anchor updates for connectors (arrows/lines) bound to the given elements.
  */
 export function getBoundArrowAnchorUpdates(
   affectedIds: Set<string>,
@@ -27,7 +29,7 @@ export function getBoundArrowAnchorUpdates(
   const updates: { id: string; patch: Partial<DiagramElement> }[] = [];
 
   for (const el of elements) {
-    if (el.type !== "arrow") continue;
+    if (!isConnector(el)) continue;
 
     const startBound = el.startBinding && affectedIds.has(el.startBinding);
     const endBound = el.endBinding && affectedIds.has(el.endBinding);
@@ -42,19 +44,21 @@ export function getBoundArrowAnchorUpdates(
       ? elements.find((e) => e.id === el.endBinding)
       : null;
 
-    if (startBound && startTarget && startTarget.type !== "arrow") {
-      const otherEnd = endTarget
-        ? getElementCenter(endTarget)
-        : { x: el.endX, y: el.endY };
+    if (startBound && startTarget && isBindable(startTarget)) {
+      const otherEnd =
+        endTarget && isBindable(endTarget)
+          ? getElementCenter(endTarget)
+          : { x: el.endX, y: el.endY };
       const anchor = getAnchorPoint(startTarget, otherEnd);
       patch.startX = anchor.x;
       patch.startY = anchor.y;
     }
 
-    if (endBound && endTarget && endTarget.type !== "arrow") {
-      const otherEnd = startTarget
-        ? getElementCenter(startTarget)
-        : { x: el.startX, y: el.startY };
+    if (endBound && endTarget && isBindable(endTarget)) {
+      const otherEnd =
+        startTarget && isBindable(startTarget)
+          ? getElementCenter(startTarget)
+          : { x: el.startX, y: el.startY };
       const anchor = getAnchorPoint(endTarget, otherEnd);
       patch.endX = anchor.x;
       patch.endY = anchor.y;

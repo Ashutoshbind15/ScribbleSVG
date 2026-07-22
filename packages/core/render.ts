@@ -4,8 +4,11 @@ import type {
   RectangleElement,
   CircleElement,
   CylinderElement,
+  DiamondElement,
   ArrowElement,
+  LineElement,
 } from "./types";
+import { getDiamondVertices, getElementBounds } from "./geometry";
 
 // ── Public types ──
 
@@ -42,8 +45,12 @@ export function getElementRoughPaths(element: DiagramElement): RoughPathData[] {
       return getCirclePaths(element);
     case "cylinder":
       return getCylinderPaths(element);
+    case "diamond":
+      return getDiamondPaths(element);
     case "arrow":
       return getArrowPaths(element);
+    case "line":
+      return getLinePaths(element);
     case "icon":
     case "text":
       // Icons are rendered from consumer SVG catalogs; text is plain SVG.
@@ -64,6 +71,20 @@ function getCirclePaths(el: CircleElement): RoughPathData[] {
   const drawable = generator.circle(el.cx, el.cy, el.radius * 2, {
     seed: el.seed,
   });
+  return generator.toPaths(drawable).map(normalizePathInfo);
+}
+
+function getDiamondPaths(el: DiamondElement): RoughPathData[] {
+  const [top, right, bottom, left] = getDiamondVertices(getElementBounds(el));
+  const drawable = generator.polygon(
+    [
+      [top.x, top.y],
+      [right.x, right.y],
+      [bottom.x, bottom.y],
+      [left.x, left.y],
+    ],
+    { seed: el.seed },
+  );
   return generator.toPaths(drawable).map(normalizePathInfo);
 }
 
@@ -112,6 +133,13 @@ function getCylinderPaths(el: CylinderElement): RoughPathData[] {
   paths.push(...generator.toPaths(bottomArc).map(normalizePathInfo));
 
   return paths;
+}
+
+function getLinePaths(el: LineElement): RoughPathData[] {
+  const line = generator.line(el.startX, el.startY, el.endX, el.endY, {
+    seed: el.seed,
+  });
+  return generator.toPaths(line).map(normalizePathInfo);
 }
 
 function getArrowPaths(el: ArrowElement): RoughPathData[] {

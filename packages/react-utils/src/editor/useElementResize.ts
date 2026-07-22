@@ -163,6 +163,7 @@ function boundsToElementPatch(
   switch (original.type) {
     case "rectangle":
     case "cylinder":
+    case "diamond":
     case "icon": {
       const patch: Partial<DiagramElement> = {
         x: bounds.x,
@@ -217,7 +218,8 @@ function boundsToElementPatch(
     }
 
     case "arrow":
-      // Arrows aren't resized via handles
+    case "line":
+      // Connectors aren't resized via handles
       return null;
   }
 }

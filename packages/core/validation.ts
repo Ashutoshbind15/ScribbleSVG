@@ -38,6 +38,18 @@ const CylinderElementSchema = z.object({
   fontSize: z.number().optional(),
 });
 
+const DiamondElementSchema = z.object({
+  id: z.string(),
+  type: z.literal("diamond"),
+  seed: z.number(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  text: z.string().optional(),
+  fontSize: z.number().optional(),
+});
+
 const IconElementSchema = z.object({
   id: z.string(),
   type: z.literal("icon"),
@@ -75,13 +87,27 @@ const ArrowElementSchema = z.object({
   endBinding: z.string().optional(),
 });
 
+const LineElementSchema = z.object({
+  id: z.string(),
+  type: z.literal("line"),
+  seed: z.number(),
+  startX: z.number(),
+  startY: z.number(),
+  endX: z.number(),
+  endY: z.number(),
+  startBinding: z.string().optional(),
+  endBinding: z.string().optional(),
+});
+
 const DiagramElementSchema = z.discriminatedUnion("type", [
   RectangleElementSchema,
   CircleElementSchema,
   CylinderElementSchema,
+  DiamondElementSchema,
   IconElementSchema,
   TextElementSchema,
   ArrowElementSchema,
+  LineElementSchema,
 ]);
 
 // ── Viewport schema ──

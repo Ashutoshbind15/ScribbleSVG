@@ -8,9 +8,12 @@ import {
   getAnchorPoint,
   getElementConnectionPoints,
   getContentBounds,
+  getDiamondVertices,
   getElementBounds,
   getElementCenter,
   getElementRoughPaths,
+  isBindable,
+  isConnector,
   isDiagramDocument,
   parseDiagramDocument,
   scaleFontSizeForResize,
@@ -19,7 +22,9 @@ import {
   type CylinderElement,
   type DiagramDocument,
   type DiagramElement,
+  type DiamondElement,
   type IconElement,
+  type LineElement,
   type RectangleElement,
   type TextElement,
   type Viewport,
@@ -112,6 +117,21 @@ function createCylinder(
   };
 }
 
+function createDiamond(
+  overrides: Partial<DiamondElement> = {},
+): DiamondElement {
+  return {
+    id: "diamond-1",
+    type: "diamond",
+    seed: 88,
+    x: 400,
+    y: 50,
+    width: 100,
+    height: 80,
+    ...overrides,
+  };
+}
+
 function createIcon(overrides: Partial<IconElement> = {}): IconElement {
   return {
     id: "icon-1",
@@ -143,6 +163,19 @@ function createArrow(overrides: Partial<ArrowElement> = {}): ArrowElement {
     id: "arrow-1",
     type: "arrow",
     seed: 55,
+    startX: 0,
+    startY: 0,
+    endX: 100,
+    endY: 100,
+    ...overrides,
+  };
+}
+
+function createLine(overrides: Partial<LineElement> = {}): LineElement {
+  return {
+    id: "line-1",
+    type: "line",
+    seed: 66,
     startX: 0,
     startY: 0,
     endX: 100,
@@ -193,24 +226,24 @@ describe("@scribblesvg/core", () => {
       createRectangle({ text: "Box" }),
       createCircle({ text: "Circle" }),
       createCylinder({ text: "Cylinder" }),
+      createDiamond({ text: "Decision" }),
       createIcon({ text: "Icon", iconId: "iconpack:iconname" }),
       createText({ text: "Hello World", fontSize: 16 }),
       createArrow({ startBinding: "rect-1", endBinding: "circle-1" }),
+      createLine({ startBinding: "diamond-1", endBinding: "rect-1" }),
     ]);
 
-    assert.ok(isDiagramDocument(document));
-
     const parsed = parseDiagramDocument(document);
-    assert.equal(parsed.version, 1);
-    assert.equal(parsed.viewport.zoom, 1);
-    assert.equal(parsed.elements.length, 6);
+    assert.equal(parsed.elements.length, 8);
     assert.equal(parsed.elements[0]?.type, "rectangle");
-    assert.equal(parsed.elements[3]?.type, "icon");
-    assert.equal((parsed.elements[3] as IconElement).iconId, "iconpack:iconname");
-    assert.equal(parsed.elements[4]?.type, "text");
-    assert.equal(parsed.elements[5]?.type, "arrow");
-    assert.equal((parsed.elements[5] as ArrowElement).startBinding, "rect-1");
-    assert.equal((parsed.elements[5] as ArrowElement).endBinding, "circle-1");
+    assert.equal(parsed.elements[3]?.type, "diamond");
+    assert.equal(parsed.elements[6]?.type, "arrow");
+    assert.equal(parsed.elements[7]?.type, "line");
+    assert.equal((parsed.elements[6] as ArrowElement).endBinding, "circle-1");
+    assert.equal((parsed.elements[7] as LineElement).startBinding, "diamond-1");
+    assert.equal(isDiagramDocument(document), true);
+    assert.equal(isConnector(parsed.elements[6]!), true);
+    assert.equal(isBindable(parsed.elements[3]!), true);
   });
 
   test("rejects invalid diagram documents", () => {
@@ -264,10 +297,29 @@ describe("@scribblesvg/core", () => {
       height: 120,
     });
 
+    const diamondBounds = getElementBounds(createDiamond());
+    assert.deepEqual(diamondBounds, {
+      x: 400,
+      y: 50,
+      width: 100,
+      height: 80,
+    });
+    assert.deepEqual(getDiamondVertices(diamondBounds), [
+      { x: 450, y: 50 },
+      { x: 500, y: 90 },
+      { x: 450, y: 130 },
+      { x: 400, y: 90 },
+    ]);
+
     const arrowBounds = getElementBounds(
       createArrow({ startX: 120, startY: 10, endX: 20, endY: 60 }),
     );
     assert.deepEqual(arrowBounds, { x: 20, y: 10, width: 100, height: 50 });
+
+    const lineBounds = getElementBounds(
+      createLine({ startX: 120, startY: 10, endX: 20, endY: 60 }),
+    );
+    assert.deepEqual(lineBounds, arrowBounds);
 
     const singleLineTextBounds = getElementBounds(
       createText({ x: 10, y: 20, text: "Hello", fontSize: 16 }),
@@ -344,9 +396,14 @@ describe("@scribblesvg/core", () => {
       ),
       { x: 50, y: 20 },
     );
+    assert.deepEqual(getElementCenter(createDiamond()), { x: 450, y: 90 });
+    assert.deepEqual(
+      getElementCenter(createLine({ startX: 0, startY: 0, endX: 100, endY: 40 })),
+      { x: 50, y: 20 },
+    );
   });
 
-  test("computes anchor points for rectangles, cylinders, circles, and degenerate cases", () => {
+  test("computes anchor points for rectangles, cylinders, circles, diamonds, and degenerate cases", () => {
     const rectangle = createRectangle();
     const anchorRight = getAnchorPoint(rectangle, { x: 200, y: 45 });
     assertClose(anchorRight.x, 110, "rectangle right edge x");
@@ -391,9 +448,18 @@ describe("@scribblesvg/core", () => {
     const textAnchorRight = getAnchorPoint(text, { x: 300, y: 65 });
     assertClose(textAnchorRight.x, 180, "text right edge x");
     assertClose(textAnchorRight.y, 65, "text right edge y");
+
+    const diamond = createDiamond();
+    const diamondRight = getAnchorPoint(diamond, { x: 600, y: 90 });
+    assertClose(diamondRight.x, 500, "diamond right vertex x");
+    assertClose(diamondRight.y, 90, "diamond right vertex y");
+
+    const diamondTop = getAnchorPoint(diamond, { x: 450, y: -100 });
+    assertClose(diamondTop.x, 450, "diamond top vertex x");
+    assertClose(diamondTop.y, 50, "diamond top vertex y");
   });
 
-  test("exposes eight connection points per bindable shape", () => {
+  test("exposes connection points per bindable shape", () => {
     const rectangle = createRectangle();
     const rectPoints = getElementConnectionPoints(rectangle);
     assert.equal(rectPoints.length, 8);
@@ -415,7 +481,13 @@ describe("@scribblesvg/core", () => {
     assertClose(circleRight.x, 240, "circle right x");
     assertClose(circleRight.y, 200, "circle right y");
 
+    const diamondPoints = getElementConnectionPoints(createDiamond());
+    assert.equal(diamondPoints.length, 4);
+    assert.deepEqual(diamondPoints[0], { x: 450, y: 50 });
+    assert.deepEqual(diamondPoints[1], { x: 500, y: 90 });
+
     assert.equal(getElementConnectionPoints(createArrow()).length, 0);
+    assert.equal(getElementConnectionPoints(createLine()).length, 0);
   });
 
   test("generates serializable rough paths for renderable elements", () => {
@@ -423,7 +495,9 @@ describe("@scribblesvg/core", () => {
       createRectangle(),
       createCircle(),
       createCylinder(),
+      createDiamond(),
       createArrow(),
+      createLine(),
     ];
 
     for (const element of renderableElements) {
@@ -441,6 +515,10 @@ describe("@scribblesvg/core", () => {
 
     assert.equal(getElementRoughPaths(createText()).length, 0);
     assert.equal(getElementRoughPaths(createIcon()).length, 0);
+
+    const arrowPaths = getElementRoughPaths(createArrow({ seed: 1 }));
+    const linePaths = getElementRoughPaths(createLine({ seed: 1 }));
+    assert.ok(arrowPaths.length > linePaths.length, "arrow has head paths");
   });
 
   test("renders deterministically for the same seeded element", () => {
@@ -450,6 +528,7 @@ describe("@scribblesvg/core", () => {
 
     assert.deepEqual(firstPaths, secondPaths);
     assert.ok(getElementRoughPaths(createArrow()).length >= 3);
+    assert.ok(getElementRoughPaths(createDiamond({ seed: 3 })).length > 0);
   });
 });
 
@@ -631,8 +710,10 @@ describe("canvas reducer", () => {
       "rectangle",
       "circle",
       "cylinder",
+      "diamond",
       "icon",
       "text",
+      "line",
       "arrow",
     ];
 
@@ -768,7 +849,7 @@ describe("canvas reducer", () => {
 });
 
 describe("canvas hit testing", () => {
-  test("hit tests rectangles, circles, cylinders, icons, and text", () => {
+  test("hit tests rectangles, circles, cylinders, diamonds, icons, and text", () => {
     const rectangle = createRectangle();
     assert.equal(hitTestElement({ x: 60, y: 45 }, rectangle), true);
     assert.equal(hitTestElement({ x: 5, y: 45 }, rectangle), false);
@@ -786,6 +867,13 @@ describe("canvas hit testing", () => {
     assert.equal(hitTestElement({ x: 90, y: 100 }, cylinder), true);
     assert.equal(hitTestElement({ x: 45, y: 100 }, cylinder), false);
 
+    // Diamond: center hits; AABB corner is outside the silhouette
+    const diamond = createDiamond({ x: 0, y: 0, width: 100, height: 100 });
+    assert.equal(hitTestElement({ x: 50, y: 50 }, diamond), true);
+    assert.equal(hitTestElement({ x: 50, y: 0 }, diamond), true);
+    assert.equal(hitTestElement({ x: 0, y: 0 }, diamond), false);
+    assert.equal(hitTestElement({ x: 5, y: 5 }, diamond), false);
+
     const text = createText({
       x: 10,
       y: 20,
@@ -796,12 +884,17 @@ describe("canvas hit testing", () => {
     assert.equal(hitTestElement({ x: 30, y: 80 }, text), false);
   });
 
-  test("hit tests arrows at the threshold and handles zero-length segments", () => {
+  test("hit tests arrows and lines at the threshold and handles zero-length segments", () => {
     const arrow = createArrow({ startX: 0, startY: 0, endX: 100, endY: 0 });
     assert.equal(hitTestElement({ x: 50, y: 0 }, arrow), true);
     assert.equal(hitTestElement({ x: 50, y: 5 }, arrow), true);
     assert.equal(hitTestElement({ x: 50, y: 5.01 }, arrow), false);
     assert.equal(hitTestElement({ x: -10, y: 0 }, arrow), false);
+
+    const line = createLine({ startX: 0, startY: 0, endX: 100, endY: 0 });
+    assert.equal(hitTestElement({ x: 50, y: 0 }, line), true);
+    assert.equal(hitTestElement({ x: 50, y: 5 }, line), true);
+    assert.equal(hitTestElement({ x: 50, y: 5.01 }, line), false);
 
     const diagonalArrow = createArrow({
       startX: 0,

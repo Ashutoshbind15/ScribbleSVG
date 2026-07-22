@@ -4,9 +4,11 @@ export type ElementType =
   | "rectangle"
   | "circle"
   | "cylinder"
+  | "diamond"
   | "icon"
   | "text"
-  | "arrow";
+  | "arrow"
+  | "line";
 
 // Base element (all elements extend this)
 export interface BaseElement {
@@ -46,6 +48,17 @@ export interface CylinderElement extends BaseElement {
   fontSize?: number; // default 14
 }
 
+/** Decision / flowchart diamond; AABB circumscribes the diamond silhouette. */
+export interface DiamondElement extends BaseElement {
+  type: "diamond";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text?: string;
+  fontSize?: number; // default 14
+}
+
 /** Icon element; artwork is resolved from a consumer `icons` catalog by `iconId`. */
 export interface IconElement extends BaseElement {
   type: "icon";
@@ -72,7 +85,7 @@ export interface TextElement extends BaseElement {
   height?: number;
 }
 
-// Arrow element
+// Connectors
 
 export interface ArrowElement extends BaseElement {
   type: "arrow";
@@ -84,15 +97,43 @@ export interface ArrowElement extends BaseElement {
   endBinding?: string; // element ID or undefined (free-floating)
 }
 
+/** Straight connector without arrowheads; same binding model as arrow. */
+export interface LineElement extends BaseElement {
+  type: "line";
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  startBinding?: string;
+  endBinding?: string;
+}
+
+export type ConnectorElement = ArrowElement | LineElement;
+
 // Union type
 
 export type DiagramElement =
   | RectangleElement
   | CircleElement
   | CylinderElement
+  | DiamondElement
   | IconElement
   | TextElement
-  | ArrowElement;
+  | ArrowElement
+  | LineElement;
+
+/** Elements that can receive arrow/line bindings. */
+export type BindableElement = Exclude<DiagramElement, ConnectorElement>;
+
+/** True for arrow/line connectors (not bind targets). */
+export function isConnector(el: DiagramElement): el is ConnectorElement {
+  return el.type === "arrow" || el.type === "line";
+}
+
+/** True for shapes/text that connectors can bind to. */
+export function isBindable(el: DiagramElement): el is BindableElement {
+  return !isConnector(el);
+}
 
 // Viewport
 

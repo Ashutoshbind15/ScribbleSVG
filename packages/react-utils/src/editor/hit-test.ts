@@ -1,16 +1,16 @@
 import {
   getElementBounds,
-  getElementCenter,
   getElementConnectionPoints,
+  isConnector,
   type Bounds,
   type DiagramElement,
 } from "@scribblesvg/core";
 
 /**
- * Hit-test threshold for arrows (distance in canvas-space pixels).
- * The user's pointer must be within this distance of the arrow line segment.
+ * Hit-test threshold for connectors (distance in canvas-space pixels).
+ * The user's pointer must be within this distance of the line segment.
  */
-const ARROW_HIT_THRESHOLD = 5;
+const CONNECTOR_HIT_THRESHOLD = 5;
 
 /**
  * Determine which element (if any) is under a given canvas-space point.
@@ -44,15 +44,19 @@ export function hitTestElement(
     case "text":
       return pointInRect(point, getElementBounds(element));
 
+    case "diamond":
+      return pointInDiamond(point, getElementBounds(element));
+
     case "circle":
       return pointInCircle(point, element.cx, element.cy, element.radius);
 
     case "arrow":
+    case "line":
       return pointNearLineSegment(
         point,
         { x: element.startX, y: element.startY },
         { x: element.endX, y: element.endY },
-        ARROW_HIT_THRESHOLD,
+        CONNECTOR_HIT_THRESHOLD,
       );
   }
 }
@@ -78,7 +82,7 @@ export function hitTestConnectionPoint(
 
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
-    if (el.type === "arrow") continue;
+    if (isConnector(el)) continue;
 
     for (const conn of getElementConnectionPoints(el)) {
       const dx = point.x - conn.x;
@@ -155,6 +159,20 @@ function pointInRect(point: { x: number; y: number }, bounds: Bounds): boolean {
     point.y >= bounds.y &&
     point.y <= bounds.y + bounds.height
   );
+}
+
+function pointInDiamond(
+  point: { x: number; y: number },
+  bounds: Bounds,
+): boolean {
+  const hw = bounds.width / 2;
+  const hh = bounds.height / 2;
+  if (hw <= 0 || hh <= 0) return false;
+  const cx = bounds.x + hw;
+  const cy = bounds.y + hh;
+  const dx = Math.abs(point.x - cx);
+  const dy = Math.abs(point.y - cy);
+  return dx / hw + dy / hh <= 1;
 }
 
 function pointInCircle(

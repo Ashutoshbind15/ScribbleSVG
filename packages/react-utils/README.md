@@ -57,7 +57,7 @@ Color presets: `inherit` (follows `currentColor`), `light`, `dark`, and `darkBlu
 
 ## DiagramCanvas
 
-Interactive editor: pan, zoom, shapes, arrows, resize, text. Import the bundled CSS once in your CMS or admin app.
+Interactive editor: pan, zoom, shapes, arrows/lines, resize, text. Import the bundled CSS once in your CMS or admin app.
 
 ```tsx
 import "@scribblesvg/react-utils/editor.css";

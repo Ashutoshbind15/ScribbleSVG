@@ -22,7 +22,7 @@ bun add @scribblesvg/core
 
 ## What's included
 
-- **Types** : `DiagramDocument`, shape and arrow elements, viewport
+- **Types** : `DiagramDocument`, shape/connector elements, viewport
 - **Validation** : parse and type-check diagram JSON
 - **Geometry** : bounds, connection points, anchors
 - **Rendering** : SVG path data for scribble-style shapes

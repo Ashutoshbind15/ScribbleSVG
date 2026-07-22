@@ -3,6 +3,7 @@ import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
+  isConnector,
   type DiagramDocument,
 } from "@scribblesvg/core";
 import { useCanvasReducer } from "./useCanvasReducer";
@@ -179,7 +180,7 @@ export function DiagramCanvas({
   const fontSizeElement =
     !editingTarget &&
     singleSelectedElement &&
-    singleSelectedElement.type !== "arrow" &&
+    !isConnector(singleSelectedElement) &&
     (singleSelectedElement.type === "text" ||
       ("text" in singleSelectedElement && !!singleSelectedElement.text))
       ? singleSelectedElement
@@ -267,7 +268,7 @@ export function DiagramCanvas({
           {/* Resize handles for single selected element */}
           {!editingTarget &&
             singleSelectedElement &&
-            singleSelectedElement.type !== "arrow" && (
+            !isConnector(singleSelectedElement) && (
               <ResizeHandles
                 element={singleSelectedElement}
                 handleSize={handleSizeCanvas}
@@ -275,18 +276,19 @@ export function DiagramCanvas({
               />
             )}
 
-          {/* Connection points while arrow tool is active */}
-          {!editingTarget && state.tool === "arrow" && (
-            <ConnectionPoints
-              elements={state.document.elements}
-              pointRadius={handleSizeCanvas}
-              hoveredPoint={hoveredConnectionPoint}
-              activeStartPoint={arrowStart?.point ?? null}
-              onPointerDown={handleConnectionPointPointerDown}
-            />
-          )}
+          {/* Connection points while a connector tool is active */}
+          {!editingTarget &&
+            (state.tool === "arrow" || state.tool === "line") && (
+              <ConnectionPoints
+                elements={state.document.elements}
+                pointRadius={handleSizeCanvas}
+                hoveredPoint={hoveredConnectionPoint}
+                activeStartPoint={arrowStart?.point ?? null}
+                onPointerDown={handleConnectionPointPointerDown}
+              />
+            )}
 
-          {/* Arrow creation preview */}
+          {/* Connector creation preview */}
           {arrowStart && previewEnd && (
             <ArrowPreview
               startX={arrowStart.point.x}

@@ -4,10 +4,13 @@ import {
   DEFAULT_TEXT_FONT_SIZE,
   generateSeed,
   getElementBounds,
+  isBindable,
+  isConnector,
   type CircleElement,
   type CylinderElement,
   type DiagramDocument,
   type DiagramElement,
+  type DiamondElement,
   type IconElement,
   type RectangleElement,
   type TextElement,
@@ -27,10 +30,15 @@ import { resolveDiagramIcon, type DiagramIcon } from "../icons";
 const DEFAULT_RECT_SIZE = { width: 150, height: 80 };
 const DEFAULT_CIRCLE_RADIUS = 50;
 const DEFAULT_CYLINDER_SIZE = { width: 100, height: 120 };
+const DEFAULT_DIAMOND_SIZE = { width: 120, height: 120 };
 const DEFAULT_ICON_SIZE = { width: 150, height: 80 };
 
 /** Handle half-size in canvas-space pixels */
 const HANDLE_SIZE = 5;
+
+function isConnectorTool(tool: ToolType): tool is "arrow" | "line" {
+  return tool === "arrow" || tool === "line";
+}
 
 /**
  * What the current pointer interaction is.
@@ -43,7 +51,7 @@ type InteractionMode =
   | "creating"; // click-drag to define size
 
 interface CreationState {
-  type: "rectangle" | "circle" | "cylinder" | "icon";
+  type: "rectangle" | "circle" | "cylinder" | "diamond" | "icon";
   startPoint: { x: number; y: number };
   elementId: string;
   seed: number;
@@ -88,15 +96,16 @@ export function useCanvasInteraction(
     cancelArrow,
   } = useArrowCreation(elements, dispatch);
 
-  // Hovered connection point while arrow tool is active
+  // Hovered connection point while a connector tool is active
   const [hoveredConnectionPoint, setHoveredConnectionPoint] =
     useState<ConnectionPointHit | null>(null);
 
   useEffect(() => {
-    if (tool !== "arrow") {
+    if (!isConnectorTool(tool)) {
       setHoveredConnectionPoint(null);
+      cancelArrow();
     }
-  }, [tool]);
+  }, [tool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Interaction mode
   const [mode, setMode] = useState<InteractionMode>("none");
@@ -159,9 +168,9 @@ export function useCanvasInteraction(
   const handleDelete = useCallback(() => {
     const idsToDelete = new Set(selectedIds);
 
-    // Cascade: find arrows bound to deleted elements
+    // Cascade: find connectors bound to deleted elements
     for (const el of elements) {
-      if (el.type !== "arrow") continue;
+      if (!isConnector(el)) continue;
       if (
         (el.startBinding && idsToDelete.has(el.startBinding)) ||
         (el.endBinding && idsToDelete.has(el.endBinding))
@@ -207,6 +216,7 @@ export function useCanvasInteraction(
       element.type === "rectangle" ||
       element.type === "circle" ||
       element.type === "cylinder" ||
+      element.type === "diamond" ||
       element.type === "icon"
     ) {
       const bounds = getElementBounds(element);
@@ -259,14 +269,14 @@ export function useCanvasInteraction(
     setEditingTarget(null);
   }, []);
 
-  // ── Pointer down on a connection point (arrow tool) ──
+  // ── Pointer down on a connection point (connector tool) ──
   const handleConnectionPointPointerDown = useCallback(
     (e: React.PointerEvent, elementId: string, point: { x: number; y: number }) => {
-      if (editingTarget || tool !== "arrow") return;
+      if (editingTarget || !isConnectorTool(tool)) return;
 
       e.preventDefault();
       e.stopPropagation();
-      handleArrowPointClick(point, elementId);
+      handleArrowPointClick(tool, point, elementId);
     },
     [editingTarget, tool, handleArrowPointClick],
   );
@@ -279,7 +289,7 @@ export function useCanvasInteraction(
 
       const selectedId = Array.from(selectedIds)[0];
       const selectedEl = elements.find((el) => el.id === selectedId);
-      if (!selectedEl || selectedEl.type === "arrow") return;
+      if (!selectedEl || isConnector(selectedEl)) return;
 
       const svg = svgRef.current;
       if (!svg) return;
@@ -327,10 +337,10 @@ export function useCanvasInteraction(
 
       if (e.button !== 0) return; // only left-click below
 
-      // Arrow tool
-      if (tool === "arrow") {
+      // Connector tools (arrow / line)
+      if (isConnectorTool(tool)) {
         const snapThreshold = HANDLE_SIZE / viewport.zoom;
-        handleArrowClick(canvasPoint, snapThreshold);
+        handleArrowClick(tool, canvasPoint, snapThreshold);
         return;
       }
 
@@ -341,7 +351,7 @@ export function useCanvasInteraction(
         e.preventDefault();
 
         const hitElement = hitTest(canvasPoint, elements);
-        if (hitElement && hitElement.type !== "arrow") {
+        if (hitElement && isBindable(hitElement)) {
           dispatch({ type: "SET_TOOL", tool: "select" });
           dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
           openTextEditor(hitElement);
@@ -382,8 +392,13 @@ export function useCanvasInteraction(
         return;
       }
 
-      // Creation tools: rectangle, circle, cylinder, icon (requires activeIconId)
-      if (tool === "rectangle" || tool === "circle" || tool === "cylinder") {
+      // Creation tools: rectangle, circle, cylinder, diamond, icon (requires activeIconId)
+      if (
+        tool === "rectangle" ||
+        tool === "circle" ||
+        tool === "cylinder" ||
+        tool === "diamond"
+      ) {
         e.preventDefault();
         const elementId = crypto.randomUUID();
         const seed = generateSeed();
@@ -408,6 +423,16 @@ export function useCanvasInteraction(
             cy: canvasPoint.y,
             radius: DEFAULT_CIRCLE_RADIUS,
           } satisfies CircleElement;
+        } else if (tool === "diamond") {
+          element = {
+            id: elementId,
+            type: "diamond",
+            seed,
+            x: canvasPoint.x,
+            y: canvasPoint.y,
+            width: DEFAULT_DIAMOND_SIZE.width,
+            height: DEFAULT_DIAMOND_SIZE.height,
+          } satisfies DiamondElement;
         } else {
           element = {
             id: elementId,
@@ -470,7 +495,7 @@ export function useCanvasInteraction(
         if (selectedIds.size === 1) {
           const selectedId = Array.from(selectedIds)[0];
           const selectedEl = elements.find((el) => el.id === selectedId);
-          if (selectedEl && selectedEl.type !== "arrow") {
+          if (selectedEl && !isConnector(selectedEl)) {
             const bounds = getElementBounds(selectedEl);
             // Adjust handle size based on zoom
             const handleSizeCanvas = HANDLE_SIZE / viewport.zoom;
@@ -570,8 +595,8 @@ export function useCanvasInteraction(
       const hitElement = hitTest(canvasPoint, elements);
       if (!hitElement) return;
 
-      // Only open editor for text elements and shapes (not arrows)
-      if (hitElement.type === "arrow") return;
+      // Only open editor for text elements and shapes (not connectors)
+      if (isConnector(hitElement)) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -632,6 +657,7 @@ export function useCanvasInteraction(
         if (
           creation.type === "rectangle" ||
           creation.type === "cylinder" ||
+          creation.type === "diamond" ||
           creation.type === "icon"
         ) {
           const x = dx >= 0 ? creation.startPoint.x : canvasPoint.x;
@@ -656,8 +682,8 @@ export function useCanvasInteraction(
         return;
       }
 
-      // Arrow tool: track hovered connection point and preview snap
-      if (tool === "arrow") {
+      // Connector tool: track hovered connection point and preview snap
+      if (isConnectorTool(tool)) {
         const snapThreshold = HANDLE_SIZE / viewport.zoom;
         setHoveredConnectionPoint(
           hitTestConnectionPoint(canvasPoint, elements, snapThreshold),
