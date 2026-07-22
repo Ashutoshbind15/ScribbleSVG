@@ -1,0 +1,38 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #e5e5e5;
+  color: #171717;
+  font-family: system-ui, sans-serif;
+}
+
+.playground {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  height: 100%;
+  padding: 1rem;
+}
+
+.playground h1 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.playground .scribblesvg-editor {
+  min-height: 0;
+  border: 1px solid #d4d4d4;
+  background: #fff;
+}
