@@ -89,7 +89,9 @@ function Editor() {
 }
 ```
 
-Documents store only `iconId` on icon elements. Pass the matching `icons` array to `DiagramCanvas` / `DiagramRenderer` so artwork can resolve. Unresolved ids render a dashed “Missing icon” placeholder. Supply trusted SVG markup.
+Documents store only `iconId` on icon elements. Pass the matching `icons` array to `DiagramCanvas` / `DiagramRenderer` so artwork can resolve. Unresolved ids render a dashed “Missing icon” placeholder.
+
+Treat catalog SVG as trusted host input (your bundled pack or admin-curated markup). Diagram JSON cannot carry SVG, so normal save/load is not an XSS path; do not put end-user-uploaded SVG strings into `icons` without sanitizing first.
 
 The editor fills its container (`height: 100%`). Give it a bounded height with your own class - on a wrapper or on `DiagramCanvas` via `className`:
 

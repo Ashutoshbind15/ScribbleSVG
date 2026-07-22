@@ -46,10 +46,10 @@ export interface CylinderElement extends BaseElement {
   fontSize?: number; // default 14
 }
 
-/** Extensible icon; rendered as a rectangle until custom SVG resolution exists. */
+/** Icon element; artwork is resolved from a consumer `icons` catalog by `iconId`. */
 export interface IconElement extends BaseElement {
   type: "icon";
-  /** Opaque consumer key for later SVG resolution (e.g. "iconpack:icon-name"). */
+  /** Opaque consumer key matched against a DiagramIcon catalog (e.g. "iconpack:icon-name"). */
   iconId: string;
   x: number;
   y: number;

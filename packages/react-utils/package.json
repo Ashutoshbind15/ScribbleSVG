@@ -1,6 +1,6 @@
 {
   "name": "@scribblesvg/react-utils",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "React components for diagram display and editing - DiagramCanvas editor and DiagramRenderer read-only view",
   "type": "module",
   "sideEffects": [
