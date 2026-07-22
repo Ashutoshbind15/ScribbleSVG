@@ -11,6 +11,20 @@ export { TextRenderer } from "./TextRenderer";
 export { InlineTextEditor } from "./InlineTextEditor";
 export type { EditingTarget } from "./InlineTextEditor";
 
+// Icons catalog
+export type {
+  DiagramIcon,
+  IconRenderMode,
+  ParsedIconSvg,
+  CatalogPartition,
+} from "../icons";
+export {
+  resolveDiagramIcon,
+  getIconRenderMode,
+  partitionIconCatalog,
+  parseIconSvg,
+} from "../icons";
+
 // State management
 export { useCanvasReducer, canvasReducer } from "./useCanvasReducer";
 export type { CanvasState, CanvasAction, ToolType } from "./useCanvasReducer";

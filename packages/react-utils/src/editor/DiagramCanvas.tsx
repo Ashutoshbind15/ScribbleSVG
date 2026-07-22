@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
@@ -18,6 +18,7 @@ import { InlineTextEditor } from "./InlineTextEditor";
 import { Toolbar } from "./Toolbar";
 import { FontSizePopup } from "./FontSizePopup";
 import { useCanvasInteraction } from "./useCanvasInteraction";
+import { partitionIconCatalog, type DiagramIcon } from "../icons";
 
 // ── Zoom limits ──
 const MIN_ZOOM = 0.1;
@@ -29,6 +30,11 @@ export interface DiagramCanvasProps {
   initialDocument?: DiagramDocument;
   /** Called whenever the document changes (for parent state tracking) */
   onChange?: (document: DiagramDocument) => void;
+  /**
+   * Icon catalog for resolving `icon` elements by `iconId`.
+   * Valid entries become toolbar placement tools; documents only store `iconId`.
+   */
+  icons?: DiagramIcon[];
   /** Optional class on the editor root (e.g. for a fixed height). Requires editor.css. */
   className?: string;
 }
@@ -40,11 +46,14 @@ export interface DiagramCanvasProps {
 export function DiagramCanvas({
   initialDocument,
   onChange,
+  icons,
   className,
 }: DiagramCanvasProps) {
   const [state, dispatch] = useCanvasReducer(initialDocument);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const catalog = useMemo(() => partitionIconCatalog(icons), [icons]);
 
   // Container dimensions for viewBox computation
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -90,7 +99,7 @@ export function DiagramCanvas({
     editingTarget,
     commitTextEditing,
     cancelTextEditing,
-  } = useCanvasInteraction(state, dispatch, svgRef, size);
+  } = useCanvasInteraction(state, dispatch, svgRef, size, catalog.valid);
 
   // ── Wheel zoom (native listener for non-passive preventDefault) ──
   // Store latest values in refs so the native listener always sees current state
@@ -212,7 +221,11 @@ export function DiagramCanvas({
       <div className="scribblesvg-editor__header">
         <Toolbar
           activeTool={state.tool}
-          onToolChange={(tool) => dispatch({ type: "SET_TOOL", tool })}
+          activeIconId={state.activeIconId}
+          catalogIcons={catalog.valid}
+          onToolChange={(tool, activeIconId) =>
+            dispatch({ type: "SET_TOOL", tool, activeIconId })
+          }
         />
         <span className="scribblesvg-editor__zoom">
           {Math.round(state.document.viewport.zoom * 100)}%
@@ -241,6 +254,7 @@ export function DiagramCanvas({
               element={el}
               isSelected={state.selectedIds.has(el.id)}
               isEditingText={editingTarget?.elementId === el.id}
+              icons={catalog.valid}
             />
           ))}
 
@@ -294,6 +308,17 @@ export function DiagramCanvas({
 
         {/* Font size popup for the selected text-bearing element */}
         {fontSizePopup}
+
+        {catalog.warnings.length > 0 && (
+          <div
+            className="scribblesvg-editor__icon-warn"
+            role="status"
+            title={catalog.warnings.join("\n")}
+          >
+            Skipped {catalog.warnings.length} invalid icon
+            {catalog.warnings.length === 1 ? "" : "s"}
+          </div>
+        )}
       </div>
     </div>
   );

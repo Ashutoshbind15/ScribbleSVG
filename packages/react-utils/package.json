@@ -18,6 +18,11 @@
       "import": "./dist/colors.js",
       "default": "./dist/colors.js"
     },
+    "./icons": {
+      "types": "./dist/icons.d.ts",
+      "import": "./dist/icons.js",
+      "default": "./dist/icons.js"
+    },
     "./editor": {
       "types": "./dist/editor/index.d.ts",
       "import": "./dist/editor/index.js",

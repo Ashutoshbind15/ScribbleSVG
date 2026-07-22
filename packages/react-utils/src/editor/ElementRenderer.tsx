@@ -6,6 +6,8 @@ import {
   getElementRoughPaths,
   type DiagramElement,
 } from "@scribblesvg/core";
+import type { DiagramIcon } from "../icons";
+import { IconArtwork } from "./IconArtwork";
 import { TextRenderer } from "./TextRenderer";
 
 interface ElementRendererProps {
@@ -13,11 +15,14 @@ interface ElementRendererProps {
   isSelected: boolean;
   /** When true, skip rendering text so the inline editor doesn't overlap it */
   isEditingText?: boolean;
+  /** Consumer icon catalog for resolving `icon` elements. */
+  icons?: DiagramIcon[];
 }
 
 /**
  * Renders a single DiagramElement as an SVG `<g>` group.
  * - Shape elements get Rough.js SVG paths
+ * - Icon elements resolve SVG from the `icons` catalog (or show a missing placeholder)
  * - Text elements get multi-line SVG `<text>` via TextRenderer
  * - Shapes with optional text get centered labels via TextRenderer
  * - A transparent hit-area rect covers the bounding box for pointer events
@@ -29,6 +34,7 @@ export function ElementRenderer({
   element,
   isSelected,
   isEditingText = false,
+  icons,
 }: ElementRendererProps) {
   const paths = useMemo(() => getElementRoughPaths(element), [element]);
   const bounds = useMemo(() => getElementBounds(element), [element]);
@@ -46,17 +52,20 @@ export function ElementRenderer({
         pointerEvents="none"
       />
 
-      {/* Rough.js paths */}
-      {paths.map((p, i) => (
-        <path
-          key={i}
-          d={p.d}
-          stroke={p.stroke}
-          strokeWidth={p.strokeWidth}
-          fill={p.fill}
-          pointerEvents="none"
-        />
-      ))}
+      {element.type === "icon" ? (
+        <IconArtwork iconId={element.iconId} bounds={bounds} icons={icons} />
+      ) : (
+        paths.map((p, i) => (
+          <path
+            key={i}
+            d={p.d}
+            stroke={p.stroke}
+            strokeWidth={p.strokeWidth}
+            fill={p.fill}
+            pointerEvents="none"
+          />
+        ))
+      )}
 
       {/* Standalone text elements — multi-line support */}
       {element.type === "text" && !isEditingText && (

@@ -21,14 +21,13 @@ import { useElementResize } from "./useElementResize";
 import { useArrowCreation } from "./useArrowCreation";
 import type { CanvasAction, ToolType, CanvasState } from "./useCanvasReducer";
 import type { EditingTarget } from "./InlineTextEditor";
+import { resolveDiagramIcon, type DiagramIcon } from "../icons";
 
 // ── Default element sizes ──
 const DEFAULT_RECT_SIZE = { width: 150, height: 80 };
 const DEFAULT_CIRCLE_RADIUS = 50;
 const DEFAULT_CYLINDER_SIZE = { width: 100, height: 120 };
 const DEFAULT_ICON_SIZE = { width: 150, height: 80 };
-/** Default opaque iconId for icons placed via the built-in toolbar tool. */
-const DEFAULT_ICON_ID = "custom";
 
 /** Handle half-size in canvas-space pixels */
 const HANDLE_SIZE = 5;
@@ -67,8 +66,9 @@ export function useCanvasInteraction(
   dispatch: React.Dispatch<CanvasAction>,
   svgRef: React.RefObject<SVGSVGElement | null>,
   containerSize: { width: number; height: number },
+  icons?: DiagramIcon[],
 ) {
-  const { document: doc, selectedIds, tool } = state;
+  const { document: doc, selectedIds, tool, activeIconId } = state;
   const elements = doc.elements;
   const viewport = doc.viewport;
 
@@ -382,13 +382,8 @@ export function useCanvasInteraction(
         return;
       }
 
-      // Creation tools: rectangle, circle, cylinder, icon
-      if (
-        tool === "rectangle" ||
-        tool === "circle" ||
-        tool === "cylinder" ||
-        tool === "icon"
-      ) {
+      // Creation tools: rectangle, circle, cylinder, icon (requires activeIconId)
+      if (tool === "rectangle" || tool === "circle" || tool === "cylinder") {
         e.preventDefault();
         const elementId = crypto.randomUUID();
         const seed = generateSeed();
@@ -413,7 +408,7 @@ export function useCanvasInteraction(
             cy: canvasPoint.y,
             radius: DEFAULT_CIRCLE_RADIUS,
           } satisfies CircleElement;
-        } else if (tool === "cylinder") {
+        } else {
           element = {
             id: elementId,
             type: "cylinder",
@@ -423,22 +418,40 @@ export function useCanvasInteraction(
             width: DEFAULT_CYLINDER_SIZE.width,
             height: DEFAULT_CYLINDER_SIZE.height,
           } satisfies CylinderElement;
-        } else {
-          element = {
-            id: elementId,
-            type: "icon",
-            seed,
-            iconId: DEFAULT_ICON_ID,
-            x: canvasPoint.x,
-            y: canvasPoint.y,
-            width: DEFAULT_ICON_SIZE.width,
-            height: DEFAULT_ICON_SIZE.height,
-          } satisfies IconElement;
         }
 
-        // Start creation drag
         creationRef.current = {
           type: tool,
+          startPoint: canvasPoint,
+          elementId,
+          seed,
+        };
+        setMode("creating");
+        dispatch({ type: "ADD_ELEMENT", element });
+        dispatch({ type: "SET_TOOL", tool: "select" });
+        dispatch({ type: "SET_SELECTION", ids: [elementId] });
+        svg.setPointerCapture(e.pointerId);
+        return;
+      }
+
+      if (tool === "icon" && activeIconId) {
+        e.preventDefault();
+        const elementId = crypto.randomUUID();
+        const seed = generateSeed();
+        const catalog = resolveDiagramIcon(icons, activeIconId);
+        const element = {
+          id: elementId,
+          type: "icon",
+          seed,
+          iconId: activeIconId,
+          x: canvasPoint.x,
+          y: canvasPoint.y,
+          width: catalog?.defaultWidth ?? DEFAULT_ICON_SIZE.width,
+          height: catalog?.defaultHeight ?? DEFAULT_ICON_SIZE.height,
+        } satisfies IconElement;
+
+        creationRef.current = {
+          type: "icon",
           startPoint: canvasPoint,
           elementId,
           seed,
@@ -665,6 +678,8 @@ export function useCanvasInteraction(
       continueDrag,
       continueResize,
       tool,
+      activeIconId,
+      icons,
       arrowStart,
       updatePreview,
       elements,

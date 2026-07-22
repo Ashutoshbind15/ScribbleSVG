@@ -31,8 +31,52 @@ body {
   font-weight: 600;
 }
 
+.playground-panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.playground-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  min-height: 0;
+  min-width: 0;
+}
+
+.playground-pane h2 {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #525252;
+}
+
 .playground .scribblesvg-editor {
   min-height: 0;
   border: 1px solid #d4d4d4;
   background: #fff;
+}
+
+.playground-renderer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 1rem;
+  border: 1px solid #d4d4d4;
+  background: #fff;
+  overflow: auto;
+}
+
+.playground-renderer svg {
+  max-height: 100%;
+}
+
+@media (max-width: 900px) {
+  .playground-panes {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(280px, 1fr) minmax(220px, 1fr);
+  }
 }

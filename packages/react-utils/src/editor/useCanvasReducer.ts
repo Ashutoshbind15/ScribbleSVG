@@ -23,13 +23,15 @@ export interface CanvasState {
   document: DiagramDocument;
   selectedIds: Set<string>;
   tool: ToolType;
+  /** Catalog iconId used when the icon tool places a new element. */
+  activeIconId: string | null;
 }
 
 // ── Actions ──
 
 export type CanvasAction =
   | { type: "SET_DOCUMENT"; document: DiagramDocument }
-  | { type: "SET_TOOL"; tool: ToolType }
+  | { type: "SET_TOOL"; tool: ToolType; activeIconId?: string | null }
   | { type: "SET_VIEWPORT"; viewport: Viewport }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
   | { type: "UPDATE_ELEMENT"; id: string; patch: Partial<DiagramElement> }
@@ -53,7 +55,14 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
       };
 
     case "SET_TOOL":
-      return { ...state, tool: action.tool };
+      return {
+        ...state,
+        tool: action.tool,
+        activeIconId:
+          action.tool === "icon"
+            ? (action.activeIconId ?? state.activeIconId)
+            : null,
+      };
 
     case "SET_VIEWPORT":
       return {
@@ -132,6 +141,7 @@ const INITIAL_STATE: CanvasState = {
   document: EMPTY_DOCUMENT,
   selectedIds: new Set(),
   tool: "select",
+  activeIconId: null,
 };
 
 export function useCanvasReducer(initialDoc?: DiagramDocument) {

@@ -12,6 +12,8 @@ import {
   type DiagramColorPreset,
   type DiagramColors,
 } from "./colors";
+import { IconArtwork } from "./editor/IconArtwork";
+import type { DiagramIcon } from "./icons";
 
 export type {
   DiagramColors,
@@ -23,6 +25,7 @@ export {
   DIAGRAM_COLOR_PRESETS,
   resolveDiagramColors,
 } from "./colors";
+export type { DiagramIcon } from "./icons";
 
 const DIAGRAM_PADDING = 24;
 const EMPTY_STATE_WIDTH = 240;
@@ -89,6 +92,8 @@ function renderTextElement(
 
 export type DiagramRendererProps = {
   document: DiagramDocument;
+  /** Consumer icon catalog for resolving `icon` elements by `iconId`. */
+  icons?: DiagramIcon[];
   /** Built-in palette to start from. Defaults to theme-aware `inherit`. */
   colorPreset?: DiagramColorPreset;
   /** Override individual colors on top of the preset. */
@@ -100,6 +105,7 @@ export type DiagramRendererProps = {
 
 export function DiagramRenderer({
   document,
+  icons,
   colorPreset,
   colors,
   className,
@@ -138,38 +144,49 @@ export function DiagramRenderer({
         ...style,
       }}
     >
-        {document.elements.map((element) => {
-          const bounds = getElementBounds(element);
-          const paths = getElementRoughPaths(element);
+      {document.elements.map((element) => {
+        const elementBounds = getElementBounds(element);
+        const paths = getElementRoughPaths(element);
 
-          return (
-            <g key={element.id} data-element-id={element.id}>
-              {paths.map((path, index) => (
+        return (
+          <g key={element.id} data-element-id={element.id}>
+            {element.type === "icon" ? (
+              <IconArtwork
+                iconId={element.iconId}
+                bounds={elementBounds}
+                icons={icons}
+                errorColor={resolvedColors.text}
+              />
+            ) : (
+              paths.map((path, index) => (
                 <path
                   key={`${element.id}-${index}`}
                   d={path.d}
                   stroke={resolvedColors.stroke}
                   strokeWidth={path.strokeWidth}
-                  fill={path.fill === "none" ? resolvedColors.fill : path.fill}
+                  fill={
+                    path.fill === "none" ? resolvedColors.fill : path.fill
+                  }
                 />
-              ))}
-              {renderTextElement(element, bounds, resolvedColors.text)}
-            </g>
-          );
-        })}
+              ))
+            )}
+            {renderTextElement(element, elementBounds, resolvedColors.text)}
+          </g>
+        );
+      })}
 
-        {document.elements.length === 0 ? (
-          <text
-            x={bounds.x + bounds.width / 2}
-            y={bounds.y + bounds.height / 2}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill={resolvedColors.text}
-            opacity={resolvedColors.mutedTextOpacity}
-          >
-            Empty diagram
-          </text>
-        ) : null}
+      {document.elements.length === 0 ? (
+        <text
+          x={bounds.x + bounds.width / 2}
+          y={bounds.y + bounds.height / 2}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill={resolvedColors.text}
+          opacity={resolvedColors.mutedTextOpacity}
+        >
+          Empty diagram
+        </text>
+      ) : null}
     </svg>
   );
 }

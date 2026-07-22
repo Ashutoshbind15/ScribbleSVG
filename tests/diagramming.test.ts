@@ -47,6 +47,13 @@ import {
   DEFAULT_DIAGRAM_COLORS,
 } from "../packages/react-utils/src/colors.ts";
 import {
+  getIconRenderMode,
+  parseIconSvg,
+  partitionIconCatalog,
+  resolveDiagramIcon,
+  type DiagramIcon,
+} from "../packages/react-utils/src/icons.ts";
+import {
   diagramSnapshot,
   parsePayload,
 } from '../utils/diagram.ts';
@@ -162,6 +169,7 @@ function createCanvasState(
     document,
     selectedIds: new Set(),
     tool: "select",
+    activeIconId: null,
   };
 }
 
@@ -415,7 +423,6 @@ describe("@scribblesvg/core", () => {
       createRectangle(),
       createCircle(),
       createCylinder(),
-      createIcon(),
       createArrow(),
     ];
 
@@ -433,6 +440,7 @@ describe("@scribblesvg/core", () => {
     }
 
     assert.equal(getElementRoughPaths(createText()).length, 0);
+    assert.equal(getElementRoughPaths(createIcon()).length, 0);
   });
 
   test("renders deterministically for the same seeded element", () => {
@@ -441,10 +449,6 @@ describe("@scribblesvg/core", () => {
     const secondPaths = getElementRoughPaths(element);
 
     assert.deepEqual(firstPaths, secondPaths);
-    assert.deepEqual(
-      getElementRoughPaths(createIcon({ seed: 7 })),
-      getElementRoughPaths(createRectangle({ seed: 7 })),
-    );
     assert.ok(getElementRoughPaths(createArrow()).length >= 3);
   });
 });
@@ -930,5 +934,96 @@ describe("diagram renderer colors", () => {
 
     assert.equal(colors.stroke, "#60a5fa");
     assert.equal(colors.text, "currentColor");
+  });
+});
+
+describe("icon catalog resolution", () => {
+  const sampleSvg =
+    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /></svg>';
+
+  const catalog: DiagramIcon[] = [
+    {
+      iconId: "server",
+      svg: sampleSvg,
+      label: "Server",
+      defaultWidth: 64,
+      defaultHeight: 64,
+    },
+    { iconId: "db", svg: '<path d="M0 0h10v10H0z" />' },
+  ];
+
+  test("resolveDiagramIcon finds by iconId and returns undefined when missing", () => {
+    assert.equal(resolveDiagramIcon(catalog, "server")?.label, "Server");
+    assert.equal(resolveDiagramIcon(catalog, "missing"), undefined);
+    assert.equal(resolveDiagramIcon(undefined, "server"), undefined);
+  });
+
+  test("getIconRenderMode resolves or reports missing", () => {
+    assert.deepEqual(getIconRenderMode(catalog, "server"), {
+      kind: "resolved",
+      icon: catalog[0],
+    });
+    assert.deepEqual(getIconRenderMode(catalog, "ghost"), {
+      kind: "missing",
+      iconId: "ghost",
+    });
+    assert.deepEqual(getIconRenderMode(undefined, "server"), {
+      kind: "missing",
+      iconId: "server",
+    });
+    assert.deepEqual(
+      getIconRenderMode([{ iconId: "empty", svg: "   " }], "empty"),
+      { kind: "missing", iconId: "empty" },
+    );
+  });
+
+  test("partitionIconCatalog keeps valid entries and warns on invalid ones", () => {
+    const { valid, warnings } = partitionIconCatalog([
+      { iconId: "ok", svg: sampleSvg },
+      { iconId: "", svg: sampleSvg },
+      { iconId: "blank", svg: "" },
+      { iconId: "ok", svg: sampleSvg },
+      { iconId: "second", svg: '<rect width="1" height="1" />' },
+    ]);
+
+    assert.equal(valid.length, 2);
+    assert.equal(valid[0]?.iconId, "ok");
+    assert.equal(valid[1]?.iconId, "second");
+    assert.equal(warnings.length, 3);
+  });
+
+  test("parseIconSvg extracts viewBox and inner content", () => {
+    const parsed = parseIconSvg(sampleSvg);
+    assert.ok(parsed);
+    assert.equal(parsed.viewBox, "0 0 24 24");
+    assert.match(parsed.content, /circle/);
+
+    assert.equal(parseIconSvg(""), null);
+    assert.equal(parseIconSvg("   "), null);
+  });
+
+  test("documents store iconId only and still validate without svg", () => {
+    const document = createDocument([
+      createIcon({ iconId: "server" }),
+    ]);
+    assert.ok(isDiagramDocument(document));
+    const icon = parseDiagramDocument(document).elements[0] as IconElement;
+    assert.equal(icon.iconId, "server");
+    assert.equal("svg" in icon, false);
+  });
+
+  test("SET_TOOL tracks activeIconId for icon placement", () => {
+    let state = createCanvasState();
+    state = canvasReducer(state, {
+      type: "SET_TOOL",
+      tool: "icon",
+      activeIconId: "server",
+    });
+    assert.equal(state.tool, "icon");
+    assert.equal(state.activeIconId, "server");
+
+    state = canvasReducer(state, { type: "SET_TOOL", tool: "select" });
+    assert.equal(state.tool, "select");
+    assert.equal(state.activeIconId, null);
   });
 });
