@@ -76,6 +76,7 @@ interface CreationState {
  * - Arrow creation (two-click)
  * - Deletion (Delete/Backspace)
  * - Copy / cut / paste (Ctrl/Cmd+C/X/V)
+ * - Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y)
  * - Double-click to edit text on any text/shape element
  */
 export function useCanvasInteraction(
@@ -138,6 +139,14 @@ export function useCanvasInteraction(
   const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(
     null,
   );
+  /** True while a new standalone text element's create+edit is one undo group. */
+  const textHistoryOpenRef = useRef(false);
+
+  const endTextHistoryGroup = useCallback(() => {
+    if (!textHistoryOpenRef.current) return;
+    textHistoryOpenRef.current = false;
+    dispatch({ type: "END_HISTORY" });
+  }, [dispatch]);
 
   // ── Delete handler ──
   const handleDelete = useCallback(() => {
@@ -232,7 +241,14 @@ export function useCanvasInteraction(
       if (!mod || e.altKey) return;
 
       const key = e.key.toLowerCase();
-      if (key === "c") {
+      if (key === "z") {
+        e.preventDefault();
+        dispatch({ type: e.shiftKey ? "REDO" : "UNDO" });
+      } else if (key === "y" && !e.metaKey) {
+        // Ctrl+Y redo (Windows/Linux); skip on macOS where Cmd+Y is unused here
+        e.preventDefault();
+        dispatch({ type: "REDO" });
+      } else if (key === "c") {
         if (handleCopy()) e.preventDefault();
       } else if (key === "x") {
         if (selectedIds.size > 0) {
@@ -258,6 +274,7 @@ export function useCanvasInteraction(
   }, [
     selectedIds,
     editingTarget,
+    dispatch,
     handleDelete,
     handleCopy,
     handleCut,
@@ -342,15 +359,17 @@ export function useCanvasInteraction(
         });
       }
 
+      endTextHistoryGroup();
       setEditingTarget(null);
     },
-    [dispatch],
+    [dispatch, endTextHistoryGroup],
   );
 
   // ── Cancel text editing ──
   const cancelTextEditing = useCallback(() => {
+    endTextHistoryGroup();
     setEditingTarget(null);
-  }, []);
+  }, [endTextHistoryGroup]);
 
   // ── Pointer down on a connection point (connector tool) ──
   const handleConnectionPointPointerDown = useCallback(
@@ -457,6 +476,8 @@ export function useCanvasInteraction(
           fontSize,
         };
 
+        dispatch({ type: "BEGIN_HISTORY" });
+        textHistoryOpenRef.current = true;
         dispatch({ type: "ADD_ELEMENT", element });
         dispatch({ type: "SET_TOOL", tool: "select" });
         dispatch({ type: "SET_SELECTION", ids: [elementId] });
@@ -535,6 +556,7 @@ export function useCanvasInteraction(
           seed,
         };
         setMode("creating");
+        dispatch({ type: "BEGIN_HISTORY" });
         dispatch({ type: "ADD_ELEMENT", element });
         dispatch({ type: "SET_TOOL", tool: "select" });
         dispatch({ type: "SET_SELECTION", ids: [elementId] });
@@ -565,6 +587,7 @@ export function useCanvasInteraction(
           seed,
         };
         setMode("creating");
+        dispatch({ type: "BEGIN_HISTORY" });
         dispatch({ type: "ADD_ELEMENT", element });
         dispatch({ type: "SET_TOOL", tool: "select" });
         dispatch({ type: "SET_SELECTION", ids: [elementId] });
@@ -826,11 +849,12 @@ export function useCanvasInteraction(
       if (mode === "creating") {
         creationRef.current = null;
         setMode("none");
+        dispatch({ type: "END_HISTORY" });
         svg.releasePointerCapture(e.pointerId);
         return;
       }
     },
-    [svgRef, mode, endDrag, endResize],
+    [svgRef, mode, endDrag, endResize, dispatch],
   );
 
   // ── Cursor ──

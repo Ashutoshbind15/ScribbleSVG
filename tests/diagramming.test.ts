@@ -214,6 +214,9 @@ function createCanvasState(
     selectedIds: new Set(),
     tool: "select",
     activeIconId: null,
+    past: [],
+    future: [],
+    historyBatchDepth: 0,
   };
 }
 
@@ -883,6 +886,125 @@ describe("canvas reducer", () => {
       select: true,
     });
     assert.equal(empty, withSelect);
+  });
+
+  test("undo and redo restore elements and selection", () => {
+    const rectangle = createRectangle({ id: "rect-001" });
+    let state = canvasReducer(createCanvasState(), {
+      type: "ADD_ELEMENT",
+      element: rectangle,
+    });
+    state = canvasReducer(state, {
+      type: "SET_SELECTION",
+      ids: ["rect-001"],
+    });
+    state = canvasReducer(state, {
+      type: "UPDATE_ELEMENT",
+      id: "rect-001",
+      patch: { x: 99 },
+    });
+
+    assert.equal(state.past.length, 2);
+    assert.equal((state.document.elements[0] as RectangleElement).x, 99);
+
+    state = canvasReducer(state, { type: "UNDO" });
+    assert.equal((state.document.elements[0] as RectangleElement).x, 10);
+    assert.deepEqual(Array.from(state.selectedIds), ["rect-001"]);
+    assert.equal(state.future.length, 1);
+
+    state = canvasReducer(state, { type: "UNDO" });
+    assert.equal(state.document.elements.length, 0);
+    assert.equal(state.selectedIds.size, 0);
+
+    state = canvasReducer(state, { type: "REDO" });
+    assert.equal(state.document.elements.length, 1);
+    assert.equal(state.document.elements[0]?.id, "rect-001");
+
+    state = canvasReducer(state, { type: "REDO" });
+    assert.equal((state.document.elements[0] as RectangleElement).x, 99);
+  });
+
+  test("history batches coalesce a gesture into one undo step", () => {
+    const rectangle = createRectangle({ id: "rect-001" });
+    let state = canvasReducer(createCanvasState(), {
+      type: "ADD_ELEMENT",
+      element: rectangle,
+    });
+
+    state = canvasReducer(state, { type: "BEGIN_HISTORY" });
+    state = canvasReducer(state, {
+      type: "UPDATE_ELEMENT",
+      id: "rect-001",
+      patch: { x: 20 },
+    });
+    state = canvasReducer(state, {
+      type: "UPDATE_ELEMENT",
+      id: "rect-001",
+      patch: { x: 40 },
+    });
+    state = canvasReducer(state, { type: "END_HISTORY" });
+
+    assert.equal(state.past.length, 2);
+    assert.equal((state.document.elements[0] as RectangleElement).x, 40);
+
+    state = canvasReducer(state, { type: "UNDO" });
+    assert.equal((state.document.elements[0] as RectangleElement).x, 10);
+  });
+
+  test("empty history batches are discarded", () => {
+    const rectangle = createRectangle({ id: "rect-001" });
+    let state = canvasReducer(createCanvasState(), {
+      type: "ADD_ELEMENT",
+      element: rectangle,
+    });
+    assert.equal(state.past.length, 1);
+
+    state = canvasReducer(state, { type: "BEGIN_HISTORY" });
+    state = canvasReducer(state, { type: "END_HISTORY" });
+    assert.equal(state.past.length, 1);
+    assert.equal(state.historyBatchDepth, 0);
+  });
+
+  test("viewport and selection changes do not create history entries", () => {
+    const rectangle = createRectangle({ id: "rect-001" });
+    let state = canvasReducer(createCanvasState(), {
+      type: "ADD_ELEMENT",
+      element: rectangle,
+    });
+    assert.equal(state.past.length, 1);
+
+    state = canvasReducer(state, {
+      type: "SET_SELECTION",
+      ids: ["rect-001"],
+    });
+    state = canvasReducer(state, {
+      type: "SET_VIEWPORT",
+      viewport: { x: 10, y: 20, zoom: 2 },
+    });
+    assert.equal(state.past.length, 1);
+
+    state = canvasReducer(state, { type: "UNDO" });
+    assert.equal(state.document.elements.length, 0);
+    // Viewport is not part of undo snapshots
+    assert.deepEqual(state.document.viewport, { x: 10, y: 20, zoom: 2 });
+  });
+
+  test("SET_DOCUMENT clears history", () => {
+    const rectangle = createRectangle({ id: "rect-001" });
+    let state = canvasReducer(createCanvasState(), {
+      type: "ADD_ELEMENT",
+      element: rectangle,
+    });
+    state = canvasReducer(state, { type: "UNDO" });
+    assert.equal(state.future.length, 1);
+
+    state = canvasReducer(state, {
+      type: "SET_DOCUMENT",
+      document: createDocument([createCircle({ id: "c1" })]),
+    });
+    assert.equal(state.past.length, 0);
+    assert.equal(state.future.length, 0);
+    assert.equal(state.document.elements[0]?.id, "c1");
   });
 });
 

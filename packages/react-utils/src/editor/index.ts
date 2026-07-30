@@ -27,7 +27,12 @@ export {
 
 // State management
 export { useCanvasReducer, canvasReducer } from "./useCanvasReducer";
-export type { CanvasState, CanvasAction, ToolType } from "./useCanvasReducer";
+export type {
+  CanvasState,
+  CanvasAction,
+  ToolType,
+  HistorySnapshot,
+} from "./useCanvasReducer";
 
 // Coordinate utilities
 export { screenToCanvas, canvasToScreen, getViewBox } from "./coordinate-utils";

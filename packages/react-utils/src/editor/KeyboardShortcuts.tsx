@@ -23,6 +23,8 @@ function buildShortcuts(mod: string): ShortcutRow[] {
     { keys: [mod, "C"], label: "Copy" },
     { keys: [mod, "X"], label: "Cut" },
     { keys: [mod, "V"], label: "Paste" },
+    { keys: [mod, "Z"], label: "Undo" },
+    { keys: [mod, "Shift", "Z"], label: "Redo" },
     { keys: ["Del"], label: "Delete selection" },
     { keys: ["2× click"], label: "Edit text" },
     { keys: ["?"], label: "Toggle this panel" },

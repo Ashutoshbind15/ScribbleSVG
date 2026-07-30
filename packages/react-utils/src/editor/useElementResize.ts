@@ -51,8 +51,9 @@ export function useElementResize(
         startBounds: getElementBounds(el),
         originalElement: el,
       };
+      dispatch({ type: "BEGIN_HISTORY" });
     },
-    [elements],
+    [elements, dispatch],
   );
 
   const continueResize = useCallback(
@@ -98,6 +99,7 @@ export function useElementResize(
     dispatchBoundArrowAnchorUpdates(new Set([resizedId]), elements, dispatch);
 
     resizeRef.current = null;
+    dispatch({ type: "END_HISTORY" });
     return true;
   }, [elements, dispatch]);
 

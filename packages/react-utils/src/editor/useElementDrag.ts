@@ -62,8 +62,9 @@ export function useElementDrag(
         startCanvasPoint: canvasPoint,
         startPositions,
       };
+      dispatch({ type: "BEGIN_HISTORY" });
     },
-    [elements],
+    [elements, dispatch],
   );
 
   const continueDrag = useCallback(
@@ -139,6 +140,7 @@ export function useElementDrag(
     dispatchBoundArrowAnchorUpdates(draggedIds, elements, dispatch);
 
     dragRef.current = null;
+    dispatch({ type: "END_HISTORY" });
     return true;
   }, [elements, dispatch]);
 
