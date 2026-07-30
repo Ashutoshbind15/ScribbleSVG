@@ -25,6 +25,14 @@ import { useArrowCreation } from "./useArrowCreation";
 import type { CanvasAction, ToolType, CanvasState } from "./useCanvasReducer";
 import type { EditingTarget } from "./InlineTextEditor";
 import { resolveDiagramIcon, type DiagramIcon } from "../icons";
+import {
+  cloneElementsForPaste,
+  collectCopyElements,
+  getEditorClipboard,
+  readSystemClipboard,
+  setEditorClipboard,
+  writeSystemClipboard,
+} from "./clipboard";
 
 // ── Default element sizes ──
 const DEFAULT_RECT_SIZE = { width: 150, height: 80 };
@@ -67,6 +75,7 @@ interface CreationState {
  * - Resizing via handles
  * - Arrow creation (two-click)
  * - Deletion (Delete/Backspace)
+ * - Copy / cut / paste (Ctrl/Cmd+C/X/V)
  * - Double-click to edit text on any text/shape element
  */
 export function useCanvasInteraction(
@@ -130,40 +139,6 @@ export function useCanvasInteraction(
     null,
   );
 
-  // ── Keyboard events ──
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't process keyboard shortcuts while editing text
-      if (editingTarget) return;
-
-      if (e.code === "Space" && !e.repeat) {
-        e.preventDefault();
-        setSpaceHeld(true);
-      }
-      if (
-        (e.code === "Delete" || e.code === "Backspace") &&
-        selectedIds.size > 0
-      ) {
-        e.preventDefault();
-        handleDelete();
-      }
-      if (e.code === "Escape") {
-        cancelArrow();
-      }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        setSpaceHeld(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-    };
-  }, [selectedIds, elements, editingTarget]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── Delete handler ──
   const handleDelete = useCallback(() => {
     const idsToDelete = new Set(selectedIds);
@@ -181,6 +156,114 @@ export function useCanvasInteraction(
 
     dispatch({ type: "DELETE_ELEMENTS", ids: Array.from(idsToDelete) });
   }, [selectedIds, elements, dispatch]);
+
+  // ── Clipboard ──
+  const handleCopy = useCallback(() => {
+    const copied = collectCopyElements(elements, selectedIds);
+    if (copied.length === 0) return false;
+    setEditorClipboard(copied);
+    writeSystemClipboard(copied);
+    return true;
+  }, [elements, selectedIds]);
+
+  const handleCut = useCallback(() => {
+    if (!handleCopy()) return;
+    handleDelete();
+  }, [handleCopy, handleDelete]);
+
+  const pasteElements = useCallback(
+    (source: DiagramElement[]) => {
+      if (source.length === 0) return;
+      const pasted = cloneElementsForPaste(source);
+      dispatch({ type: "ADD_ELEMENTS", elements: pasted, select: true });
+      // Next paste steps further from the last paste, not the original copy.
+      setEditorClipboard(pasted);
+      writeSystemClipboard(pasted);
+    },
+    [dispatch],
+  );
+
+  const handlePaste = useCallback(async () => {
+    const local = getEditorClipboard();
+    if (local && local.length > 0) {
+      pasteElements(local);
+      return;
+    }
+
+    const fromSystem = await readSystemClipboard();
+    if (fromSystem && fromSystem.length > 0) {
+      setEditorClipboard(fromSystem);
+      pasteElements(fromSystem);
+    }
+  }, [pasteElements]);
+
+  // ── Keyboard events ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't process keyboard shortcuts while editing text
+      if (editingTarget) return;
+
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.code === "Space" && !e.repeat) {
+        e.preventDefault();
+        setSpaceHeld(true);
+      }
+      if (
+        (e.code === "Delete" || e.code === "Backspace") &&
+        selectedIds.size > 0
+      ) {
+        e.preventDefault();
+        handleDelete();
+      }
+      if (e.code === "Escape") {
+        cancelArrow();
+      }
+
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod || e.altKey) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "c") {
+        if (handleCopy()) e.preventDefault();
+      } else if (key === "x") {
+        if (selectedIds.size > 0) {
+          e.preventDefault();
+          handleCut();
+        }
+      } else if (key === "v") {
+        e.preventDefault();
+        void handlePaste();
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        setSpaceHeld(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [
+    selectedIds,
+    editingTarget,
+    handleDelete,
+    handleCopy,
+    handleCut,
+    handlePaste,
+    cancelArrow,
+  ]);
 
   // ── Canvas-space point from pointer event ──
   const getCanvasPoint = useCallback(

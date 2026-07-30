@@ -47,6 +47,17 @@ import {
   type ToolType,
 } from "../packages/react-utils/src/editor/useCanvasReducer.ts";
 import {
+  PASTE_OFFSET,
+  clearEditorClipboard,
+  cloneElementsForPaste,
+  collectCopyElements,
+  getEditorClipboard,
+  parseClipboard,
+  serializeClipboard,
+  setEditorClipboard,
+  translateElement,
+} from "../packages/react-utils/src/editor/clipboard.ts";
+import {
   resolveDiagramColors,
   DIAGRAM_COLOR_PRESETS,
   DEFAULT_DIAGRAM_COLORS,
@@ -845,6 +856,149 @@ describe("canvas reducer", () => {
       type: "UNKNOWN",
     } as never);
     assert.equal(unchangedByUnknownAction, initialState);
+  });
+
+  test("adds multiple elements and optionally selects them", () => {
+    const rectangle = createRectangle({ id: "rect-a" });
+    const circle = createCircle({ id: "circle-a" });
+
+    const withoutSelect = canvasReducer(createCanvasState(), {
+      type: "ADD_ELEMENTS",
+      elements: [rectangle],
+    });
+    assert.equal(withoutSelect.document.elements.length, 1);
+    assert.equal(withoutSelect.selectedIds.size, 0);
+
+    const withSelect = canvasReducer(withoutSelect, {
+      type: "ADD_ELEMENTS",
+      elements: [circle],
+      select: true,
+    });
+    assert.equal(withSelect.document.elements.length, 2);
+    assert.deepEqual(Array.from(withSelect.selectedIds), ["circle-a"]);
+
+    const empty = canvasReducer(withSelect, {
+      type: "ADD_ELEMENTS",
+      elements: [],
+      select: true,
+    });
+    assert.equal(empty, withSelect);
+  });
+});
+
+describe("clipboard", () => {
+  test("collects selected elements and fully-bound connectors between them", () => {
+    const rect = createRectangle({ id: "r1" });
+    const circle = createCircle({ id: "c1" });
+    const diamond = createDiamond({ id: "d1" });
+    const internalArrow = createArrow({
+      id: "a-internal",
+      startBinding: "r1",
+      endBinding: "c1",
+    });
+    const externalArrow = createArrow({
+      id: "a-external",
+      startBinding: "r1",
+      endBinding: "d1",
+    });
+
+    const copied = collectCopyElements(
+      [rect, circle, diamond, internalArrow, externalArrow],
+      new Set(["r1", "c1"]),
+    );
+
+    assert.deepEqual(
+      copied.map((el) => el.id),
+      ["r1", "c1", "a-internal"],
+    );
+  });
+
+  test("clones pasted elements with new ids, seeds, remapped bindings, and offset", () => {
+    const rect = createRectangle({ id: "r1", x: 10, y: 20, seed: 1 });
+    const circle = createCircle({ id: "c1", cx: 100, cy: 100, seed: 2 });
+    const arrow = createArrow({
+      id: "a1",
+      startX: 10,
+      startY: 20,
+      endX: 100,
+      endY: 100,
+      startBinding: "r1",
+      endBinding: "c1",
+      seed: 3,
+    });
+    const dangling = createArrow({
+      id: "a2",
+      startBinding: "r1",
+      endBinding: "missing",
+      seed: 4,
+    });
+
+    const pasted = cloneElementsForPaste([rect, circle, arrow, dangling]);
+
+    assert.equal(pasted.length, 4);
+    assert.notEqual(pasted[0]?.id, "r1");
+    assert.notEqual(pasted[0]?.seed, 1);
+    assert.equal((pasted[0] as RectangleElement).x, 10 + PASTE_OFFSET);
+    assert.equal((pasted[0] as RectangleElement).y, 20 + PASTE_OFFSET);
+    assert.equal((pasted[1] as CircleElement).cx, 100 + PASTE_OFFSET);
+
+    const pastedArrow = pasted[2] as ArrowElement;
+    assert.equal(pastedArrow.startBinding, pasted[0]?.id);
+    assert.equal(pastedArrow.endBinding, pasted[1]?.id);
+    assert.equal(pastedArrow.startX, 10 + PASTE_OFFSET);
+
+    const pastedDangling = pasted[3] as ArrowElement;
+    assert.equal(pastedDangling.startBinding, pasted[0]?.id);
+    assert.equal(pastedDangling.endBinding, undefined);
+  });
+
+  test("translates each element type and round-trips clipboard JSON", () => {
+    const rect = translateElement(createRectangle({ x: 0, y: 0 }), 5, 7);
+    assert.equal(rect.x, 5);
+    assert.equal(rect.y, 7);
+
+    const circle = translateElement(
+      createCircle({ cx: 1, cy: 2 }),
+      3,
+      4,
+    );
+    assert.equal(circle.cx, 4);
+    assert.equal(circle.cy, 6);
+
+    const arrow = translateElement(
+      createArrow({ startX: 0, startY: 0, endX: 10, endY: 10 }),
+      1,
+      2,
+    );
+    assert.equal(arrow.startX, 1);
+    assert.equal(arrow.endY, 12);
+
+    const payload = serializeClipboard([createRectangle({ id: "r1" })]);
+    const parsed = parseClipboard(payload);
+    assert.equal(parsed?.length, 1);
+    assert.equal(parsed?.[0]?.id, "r1");
+    assert.equal(parseClipboard("not-json"), null);
+    assert.equal(parseClipboard('{"type":"other","version":1,"elements":[]}'), null);
+  });
+
+  test("stores and retrieves the in-memory editor clipboard", () => {
+    clearEditorClipboard();
+    assert.equal(getEditorClipboard(), null);
+
+    setEditorClipboard([createRectangle({ id: "clip-1", x: 9 })]);
+    const stored = getEditorClipboard();
+    assert.equal(stored?.[0]?.id, "clip-1");
+    assert.equal((stored?.[0] as RectangleElement).x, 9);
+
+    // Mutations to the returned copy must not affect storage
+    (stored![0] as RectangleElement).x = 999;
+    assert.equal(
+      (getEditorClipboard()![0] as RectangleElement).x,
+      9,
+    );
+
+    clearEditorClipboard();
+    assert.equal(getEditorClipboard(), null);
   });
 });
 

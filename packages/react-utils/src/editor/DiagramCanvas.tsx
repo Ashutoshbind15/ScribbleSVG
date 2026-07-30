@@ -18,6 +18,7 @@ import { ArrowPreview } from "./ArrowPreview";
 import { InlineTextEditor } from "./InlineTextEditor";
 import { Toolbar } from "./Toolbar";
 import { FontSizePopup } from "./FontSizePopup";
+import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useCanvasInteraction } from "./useCanvasInteraction";
 import { partitionIconCatalog, type DiagramIcon } from "../icons";
 
@@ -228,6 +229,7 @@ export function DiagramCanvas({
             dispatch({ type: "SET_TOOL", tool, activeIconId })
           }
         />
+        <KeyboardShortcuts />
         <span className="scribblesvg-editor__zoom">
           {Math.round(state.document.viewport.zoom * 100)}%
         </span>

@@ -47,3 +47,17 @@ export { useElementDrag } from "./useElementDrag";
 export { useElementResize } from "./useElementResize";
 export { useArrowCreation } from "./useArrowCreation";
 export type { ConnectorKind, ArrowStartState } from "./useArrowCreation";
+
+// Clipboard
+export {
+  PASTE_OFFSET,
+  collectCopyElements,
+  cloneElementsForPaste,
+  translateElement,
+  serializeClipboard,
+  parseClipboard,
+  getEditorClipboard,
+  setEditorClipboard,
+  clearEditorClipboard,
+} from "./clipboard";
+export type { ClipboardPayload } from "./clipboard";

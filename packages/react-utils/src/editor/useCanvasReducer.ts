@@ -36,6 +36,12 @@ export type CanvasAction =
   | { type: "SET_TOOL"; tool: ToolType; activeIconId?: string | null }
   | { type: "SET_VIEWPORT"; viewport: Viewport }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
+  | {
+      type: "ADD_ELEMENTS";
+      elements: DiagramElement[];
+      /** When true, selection becomes the newly added element ids. */
+      select?: boolean;
+    }
   | { type: "UPDATE_ELEMENT"; id: string; patch: Partial<DiagramElement> }
   | {
       type: "UPDATE_ELEMENTS";
@@ -79,6 +85,19 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
           ...state.document,
           elements: [...state.document.elements, action.element],
         },
+      };
+
+    case "ADD_ELEMENTS":
+      if (action.elements.length === 0) return state;
+      return {
+        ...state,
+        document: {
+          ...state.document,
+          elements: [...state.document.elements, ...action.elements],
+        },
+        selectedIds: action.select
+          ? new Set(action.elements.map((el) => el.id))
+          : state.selectedIds,
       };
 
     case "UPDATE_ELEMENT":
