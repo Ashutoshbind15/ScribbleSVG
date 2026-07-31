@@ -35,11 +35,15 @@ import {
   screenToCanvas,
 } from "../packages/react-utils/src/editor/coordinate-utils.ts";
 import {
+  boundsFromPoints,
+  boundsIntersect,
   getResizeHandles,
   hitTest,
   hitTestElement,
+  hitTestMarquee,
   hitTestResizeHandle,
   hitTestConnectionPoint,
+  resolveMarqueeSelection,
 } from "../packages/react-utils/src/editor/hit-test.ts";
 import {
   canvasReducer,
@@ -1256,6 +1260,151 @@ describe("canvas hit testing", () => {
     assert.equal(hitTestResizeHandle({ x: 13, y: 23 }, bounds, 5), "nw");
     assert.equal(hitTestResizeHandle({ x: 115, y: 75 }, bounds, 5), "se");
     assert.equal(hitTestResizeHandle({ x: 60, y: 45 }, bounds, 5), null);
+  });
+
+  test("normalizes marquee corners and detects AABB intersection", () => {
+    assert.deepEqual(boundsFromPoints({ x: 100, y: 80 }, { x: 20, y: 10 }), {
+      x: 20,
+      y: 10,
+      width: 80,
+      height: 70,
+    });
+
+    assert.equal(
+      boundsIntersect(
+        { x: 0, y: 0, width: 50, height: 50 },
+        { x: 49, y: 49, width: 10, height: 10 },
+      ),
+      true,
+    );
+    assert.equal(
+      boundsIntersect(
+        { x: 0, y: 0, width: 50, height: 50 },
+        { x: 51, y: 0, width: 10, height: 10 },
+      ),
+      false,
+    );
+  });
+
+  test("marquee selects intersecting shapes and segment-crossing connectors", () => {
+    const left = createRectangle({
+      id: "left",
+      x: 0,
+      y: 0,
+      width: 40,
+      height: 40,
+    });
+    const right = createRectangle({
+      id: "right",
+      x: 100,
+      y: 0,
+      width: 40,
+      height: 40,
+    });
+    const circle = createCircle({
+      id: "circle",
+      cx: 200,
+      cy: 200,
+      radius: 20,
+    });
+    // Diagonal (0,100)→(100,0): segment crosses center of this marquee.
+    const diagonal = createArrow({
+      id: "diag",
+      startX: 0,
+      startY: 100,
+      endX: 100,
+      endY: 0,
+    });
+
+    const marquee = { x: 30, y: 30, width: 50, height: 50 };
+    const hits = hitTestMarquee(marquee, [left, right, circle, diagonal]);
+    assert.deepEqual(hits.map((el) => el.id).sort(), ["diag", "left"]);
+
+    // Corner box overlaps the diagonal's AABB but not the segment itself.
+    const cornerMiss = createLine({
+      id: "corner-miss",
+      startX: 0,
+      startY: 100,
+      endX: 100,
+      endY: 0,
+    });
+    assert.deepEqual(
+      hitTestMarquee({ x: 70, y: 70, width: 20, height: 20 }, [cornerMiss]),
+      [],
+    );
+
+    // Contained shape
+    assert.deepEqual(
+      hitTestMarquee({ x: -10, y: -10, width: 80, height: 80 }, [left]).map(
+        (el) => el.id,
+      ),
+      ["left"],
+    );
+
+    // Empty / zero-size marquee selects nothing
+    assert.deepEqual(
+      hitTestMarquee({ x: 0, y: 0, width: 0, height: 0 }, [left]),
+      [],
+    );
+  });
+
+  test("resolveMarqueeSelection handles click, replace, and additive drag", () => {
+    const a = createRectangle({ id: "a", x: 0, y: 0, width: 40, height: 40 });
+    const b = createRectangle({ id: "b", x: 100, y: 0, width: 40, height: 40 });
+
+    assert.deepEqual(
+      resolveMarqueeSelection({
+        startPoint: { x: 0, y: 0 },
+        endPoint: { x: 1, y: 1 },
+        screenStart: { x: 0, y: 0 },
+        screenEnd: { x: 1, y: 1 },
+        additive: false,
+        selectedIds: new Set(["a"]),
+        elements: [a, b],
+      }),
+      { type: "clear" },
+    );
+
+    assert.deepEqual(
+      resolveMarqueeSelection({
+        startPoint: { x: 0, y: 0 },
+        endPoint: { x: 1, y: 1 },
+        screenStart: { x: 0, y: 0 },
+        screenEnd: { x: 1, y: 1 },
+        additive: true,
+        selectedIds: new Set(["a"]),
+        elements: [a, b],
+      }),
+      { type: "keep" },
+    );
+
+    const replaced = resolveMarqueeSelection({
+      startPoint: { x: -10, y: -10 },
+      endPoint: { x: 50, y: 50 },
+      screenStart: { x: 0, y: 0 },
+      screenEnd: { x: 40, y: 40 },
+      additive: false,
+      selectedIds: new Set(["b"]),
+      elements: [a, b],
+    });
+    assert.equal(replaced.type, "set");
+    if (replaced.type === "set") {
+      assert.deepEqual(replaced.ids, ["a"]);
+    }
+
+    const additive = resolveMarqueeSelection({
+      startPoint: { x: 90, y: -10 },
+      endPoint: { x: 150, y: 50 },
+      screenStart: { x: 0, y: 0 },
+      screenEnd: { x: 40, y: 40 },
+      additive: true,
+      selectedIds: new Set(["a"]),
+      elements: [a, b],
+    });
+    assert.equal(additive.type, "set");
+    if (additive.type === "set") {
+      assert.deepEqual(additive.ids.sort(), ["a", "b"]);
+    }
   });
 
   test("hit-tests connection points with topmost element preference", () => {

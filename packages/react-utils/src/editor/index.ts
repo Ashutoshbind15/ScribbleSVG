@@ -3,8 +3,8 @@ export { DiagramCanvas } from "./DiagramCanvas";
 export type { DiagramCanvasProps } from "./DiagramCanvas";
 export { Toolbar } from "./Toolbar";
 export { ElementRenderer } from "./ElementRenderer";
-export { GridBackground } from "./GridBackground";
 export { SelectionOverlay } from "./SelectionOverlay";
+export { MarqueeOverlay } from "./MarqueeOverlay";
 export { ResizeHandles } from "./ResizeHandles";
 export { ArrowPreview } from "./ArrowPreview";
 export { TextRenderer } from "./TextRenderer";
@@ -42,9 +42,18 @@ export {
   hitTest,
   hitTestElement,
   hitTestResizeHandle,
+  hitTestMarquee,
+  resolveMarqueeSelection,
+  boundsFromPoints,
+  boundsIntersect,
+  MARQUEE_CLICK_THRESHOLD_PX,
   getResizeHandles,
 } from "./hit-test";
-export type { HandlePosition, HandleInfo } from "./hit-test";
+export type {
+  HandlePosition,
+  HandleInfo,
+  MarqueeSelectionResult,
+} from "./hit-test";
 
 // Interaction hooks
 export { useCanvasInteraction } from "./useCanvasInteraction";

@@ -6,6 +6,7 @@ import {
   getElementBounds,
   isBindable,
   isConnector,
+  type Bounds,
   type CircleElement,
   type CylinderElement,
   type DiagramDocument,
@@ -17,7 +18,13 @@ import {
   type Viewport,
 } from "@scribblesvg/core";
 import { screenToCanvas } from "./coordinate-utils";
-import { hitTest, hitTestResizeHandle, hitTestConnectionPoint } from "./hit-test";
+import {
+  boundsFromPoints,
+  hitTest,
+  hitTestResizeHandle,
+  hitTestConnectionPoint,
+  resolveMarqueeSelection,
+} from "./hit-test";
 import type { HandlePosition, ConnectionPointHit } from "./hit-test";
 import { useElementDrag } from "./useElementDrag";
 import { useElementResize } from "./useElementResize";
@@ -56,7 +63,8 @@ type InteractionMode =
   | "panning"
   | "dragging"
   | "resizing"
-  | "creating"; // click-drag to define size
+  | "creating" // click-drag to define size
+  | "marqueeing"; // drag a virtual rect to multi-select
 
 interface CreationState {
   type: "rectangle" | "circle" | "cylinder" | "diamond" | "icon";
@@ -65,12 +73,21 @@ interface CreationState {
   seed: number;
 }
 
+interface MarqueeState {
+  startPoint: { x: number; y: number };
+  currentPoint: { x: number; y: number };
+  /** Screen coords at pointer-down — used to distinguish click vs drag. */
+  screenStart: { x: number; y: number };
+  /** Shift held at start → union with existing selection on release. */
+  additive: boolean;
+}
+
 /**
  * Top-level hook that composes all canvas interactions:
  * - Pan/zoom
  * - Element creation (click or click-drag)
  * - Text tool creation + inline editing
- * - Selection (click, shift-click)
+ * - Selection (click, shift-click, marquee/box-select)
  * - Dragging elements
  * - Resizing via handles
  * - Arrow creation (two-click)
@@ -134,6 +151,10 @@ export function useCanvasInteraction(
 
   // Creation drag state
   const creationRef = useRef<CreationState | null>(null);
+
+  // Marquee (box) selection state
+  const marqueeRef = useRef<MarqueeState | null>(null);
+  const [marqueeBounds, setMarqueeBounds] = useState<Bounds | null>(null);
 
   // ── Text editing state ──
   const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(
@@ -235,6 +256,11 @@ export function useCanvasInteraction(
       }
       if (e.code === "Escape") {
         cancelArrow();
+        // Clear marquee preview; pointer-up still ends the gesture / releases capture.
+        if (marqueeRef.current) {
+          marqueeRef.current = null;
+          setMarqueeBounds(null);
+        }
       }
 
       const mod = e.metaKey || e.ctrlKey;
@@ -387,7 +413,9 @@ export function useCanvasInteraction(
   const handleResizeHandlePointerDown = useCallback(
     (e: React.PointerEvent, handle: HandlePosition) => {
       if (editingTarget) return;
-      if (tool !== "select" || selectedIds.size !== 1) return;
+      if (tool !== "select" || selectedIds.size !== 1) {
+        return;
+      }
 
       const selectedId = Array.from(selectedIds)[0];
       const selectedEl = elements.find((el) => el.id === selectedId);
@@ -595,7 +623,7 @@ export function useCanvasInteraction(
         return;
       }
 
-      // Select tool interactions
+      // Select tool: click-select, drag-move, or marquee on empty canvas
       if (tool === "select") {
         // Check if pointer is on a resize handle of a selected element
         if (selectedIds.size === 1) {
@@ -656,11 +684,17 @@ export function useCanvasInteraction(
           startDrag(dragIds, canvasPoint);
           svg.setPointerCapture(e.pointerId);
         } else {
-          // Clicked empty canvas → clear selection and start panning
-          dispatch({ type: "CLEAR_SELECTION" });
-          setMode("panning");
-          setPanStart({ x: e.clientX, y: e.clientY });
-          setPanViewportStart({ x: viewport.x, y: viewport.y });
+          // Empty canvas → box selection (click without drag clears)
+          e.preventDefault();
+          const marquee: MarqueeState = {
+            startPoint: canvasPoint,
+            currentPoint: canvasPoint,
+            screenStart: { x: e.clientX, y: e.clientY },
+            additive: e.shiftKey,
+          };
+          marqueeRef.current = marquee;
+          setMarqueeBounds(boundsFromPoints(canvasPoint, canvasPoint));
+          setMode("marqueeing");
           svg.setPointerCapture(e.pointerId);
         }
       }
@@ -679,6 +713,8 @@ export function useCanvasInteraction(
       startResize,
       editingTarget,
       openTextEditor,
+      activeIconId,
+      icons,
     ],
   );
 
@@ -788,6 +824,17 @@ export function useCanvasInteraction(
         return;
       }
 
+      if (mode === "marqueeing" && marqueeRef.current) {
+        marqueeRef.current = {
+          ...marqueeRef.current,
+          currentPoint: canvasPoint,
+        };
+        setMarqueeBounds(
+          boundsFromPoints(marqueeRef.current.startPoint, canvasPoint),
+        );
+        return;
+      }
+
       // Connector tool: track hovered connection point and preview snap
       if (isConnectorTool(tool)) {
         const snapThreshold = HANDLE_SIZE / viewport.zoom;
@@ -810,8 +857,6 @@ export function useCanvasInteraction(
       continueDrag,
       continueResize,
       tool,
-      activeIconId,
-      icons,
       arrowStart,
       updatePreview,
       elements,
@@ -853,8 +898,45 @@ export function useCanvasInteraction(
         svg.releasePointerCapture(e.pointerId);
         return;
       }
+
+      if (mode === "marqueeing") {
+        const marquee = marqueeRef.current;
+        marqueeRef.current = null;
+        setMarqueeBounds(null);
+        setMode("none");
+        svg.releasePointerCapture(e.pointerId);
+
+        // Cancelled via Escape (ref cleared mid-gesture)
+        if (!marquee) return;
+
+        const result = resolveMarqueeSelection({
+          startPoint: marquee.startPoint,
+          endPoint: getCanvasPoint(e),
+          screenStart: marquee.screenStart,
+          screenEnd: { x: e.clientX, y: e.clientY },
+          additive: marquee.additive,
+          selectedIds,
+          elements,
+        });
+
+        if (result.type === "clear") {
+          dispatch({ type: "CLEAR_SELECTION" });
+        } else if (result.type === "set") {
+          dispatch({ type: "SET_SELECTION", ids: result.ids });
+        }
+        return;
+      }
     },
-    [svgRef, mode, endDrag, endResize, dispatch],
+    [
+      svgRef,
+      mode,
+      endDrag,
+      endResize,
+      dispatch,
+      elements,
+      selectedIds,
+      getCanvasPoint,
+    ],
   );
 
   // ── Cursor ──
@@ -863,6 +945,7 @@ export function useCanvasInteraction(
     if (mode === "panning") return "grabbing";
     if (mode === "resizing") return "nwse-resize";
     if (mode === "dragging") return "move";
+    if (mode === "marqueeing") return "crosshair";
     if (spaceHeld) return "grab";
     if (tool === "select") return "default";
     return "crosshair";
@@ -879,6 +962,7 @@ export function useCanvasInteraction(
     arrowStart,
     previewEnd,
     hoveredConnectionPoint,
+    marqueeBounds,
     spaceHeld,
     handleSize: HANDLE_SIZE,
     // Text editing

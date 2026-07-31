@@ -44,7 +44,7 @@ export function Toolbar({
   catalogIcons = [],
   onToolChange,
 }: ToolbarProps) {
-  // Shapes before catalog icons; text + connectors after
+  // Select + shapes before catalog icons; text + connectors after
   const beforeText = BUILTIN_TOOLS.slice(0, 5);
   const afterShapes = BUILTIN_TOOLS.slice(5);
 

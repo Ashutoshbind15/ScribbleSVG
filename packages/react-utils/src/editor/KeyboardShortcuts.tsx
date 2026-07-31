@@ -25,7 +25,14 @@ function modKey(isApple: boolean): string {
 
 function buildShortcuts(mod: string, isApple: boolean): ShortcutRow[] {
   return [
+    { keys: ["Two-finger scroll"], label: "Pan canvas" },
+    { keys: ["Pinch"], label: "Zoom (trackpad)" },
+    { keys: ["Ctrl", "scroll"], label: "Zoom (fine)" },
+    { keys: ["Scroll wheel"], label: "Zoom (mouse)" },
+    { keys: ["Space", "drag"], label: "Pan canvas" },
     { keys: ["Shift", "click"], label: "Multi-select" },
+    { keys: ["Drag empty"], label: "Box select" },
+    { keys: ["Shift", "drag"], label: "Add to box selection" },
     { keys: [mod, "C"], label: "Copy" },
     { keys: [mod, "X"], label: "Cut" },
     { keys: [mod, "V"], label: "Paste" },

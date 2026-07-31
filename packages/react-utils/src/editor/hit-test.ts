@@ -150,6 +150,186 @@ export function hitTestResizeHandle(
   return null;
 }
 
+// ── Marquee (box) selection ──
+
+/** Normalize two corners into an axis-aligned bounds rect. */
+export function boundsFromPoints(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): Bounds {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return {
+    x,
+    y,
+    width: Math.abs(b.x - a.x),
+    height: Math.abs(b.y - a.y),
+  };
+}
+
+/** True if two AABBs overlap (edges touching counts as intersection). */
+export function boundsIntersect(a: Bounds, b: Bounds): boolean {
+  return (
+    a.x <= b.x + b.width &&
+    a.x + a.width >= b.x &&
+    a.y <= b.y + b.height &&
+    a.y + a.height >= b.y
+  );
+}
+
+/**
+ * Elements whose geometry intersects the marquee rectangle.
+ * Shapes use AABB intersection; connectors use segment∩rect so thin
+ * diagonals aren't selected via empty corner of their bounding box.
+ */
+export function hitTestMarquee(
+  marquee: Bounds,
+  elements: DiagramElement[],
+): DiagramElement[] {
+  if (marquee.width <= 0 && marquee.height <= 0) return [];
+
+  const hits: DiagramElement[] = [];
+  for (const el of elements) {
+    if (elementIntersectsMarquee(el, marquee)) {
+      hits.push(el);
+    }
+  }
+  return hits;
+}
+
+/** Screen-space movement below this is treated as a click (not a drag-select). */
+export const MARQUEE_CLICK_THRESHOLD_PX = 4;
+
+export type MarqueeSelectionResult =
+  | { type: "clear" }
+  | { type: "keep" }
+  | { type: "set"; ids: string[] };
+
+/**
+ * Resolve what the selection should become after a marquee gesture ends.
+ * Pure: click-vs-drag, additive union, and intersection hit-testing.
+ */
+export function resolveMarqueeSelection(args: {
+  startPoint: { x: number; y: number };
+  endPoint: { x: number; y: number };
+  screenStart: { x: number; y: number };
+  screenEnd: { x: number; y: number };
+  additive: boolean;
+  selectedIds: ReadonlySet<string>;
+  elements: DiagramElement[];
+  clickThresholdPx?: number;
+}): MarqueeSelectionResult {
+  const {
+    startPoint,
+    endPoint,
+    screenStart,
+    screenEnd,
+    additive,
+    selectedIds,
+    elements,
+    clickThresholdPx = MARQUEE_CLICK_THRESHOLD_PX,
+  } = args;
+
+  const screenDx = screenEnd.x - screenStart.x;
+  const screenDy = screenEnd.y - screenStart.y;
+  const isClick = Math.hypot(screenDx, screenDy) < clickThresholdPx;
+
+  if (isClick) {
+    return additive ? { type: "keep" } : { type: "clear" };
+  }
+
+  const hits = hitTestMarquee(boundsFromPoints(startPoint, endPoint), elements);
+  if (additive) {
+    const next = new Set(selectedIds);
+    for (const el of hits) next.add(el.id);
+    return { type: "set", ids: Array.from(next) };
+  }
+
+  return { type: "set", ids: hits.map((el) => el.id) };
+}
+
+function elementIntersectsMarquee(
+  element: DiagramElement,
+  marquee: Bounds,
+): boolean {
+  if (element.type === "arrow" || element.type === "line") {
+    return lineSegmentIntersectsRect(
+      { x: element.startX, y: element.startY },
+      { x: element.endX, y: element.endY },
+      marquee,
+    );
+  }
+
+  // Circles / diamonds: AABB intersection is the usual diagram-editor
+  // approximation and matches “select what the box touches.”
+  return boundsIntersect(getElementBounds(element), marquee);
+}
+
+/**
+ * True if segment AB intersects (or is contained by) axis-aligned `rect`.
+ */
+function lineSegmentIntersectsRect(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  rect: Bounds,
+): boolean {
+  if (pointInRect(a, rect) || pointInRect(b, rect)) return true;
+
+  const left = { x: rect.x, y: rect.y };
+  const right = { x: rect.x + rect.width, y: rect.y };
+  const bottomLeft = { x: rect.x, y: rect.y + rect.height };
+  const bottomRight = { x: rect.x + rect.width, y: rect.y + rect.height };
+
+  return (
+    segmentsIntersect(a, b, left, right) ||
+    segmentsIntersect(a, b, right, bottomRight) ||
+    segmentsIntersect(a, b, bottomRight, bottomLeft) ||
+    segmentsIntersect(a, b, bottomLeft, left)
+  );
+}
+
+/** True if open/closed segments AB and CD properly intersect or touch. */
+function segmentsIntersect(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  c: { x: number; y: number },
+  d: { x: number; y: number },
+): boolean {
+  const orient = (
+    p: { x: number; y: number },
+    q: { x: number; y: number },
+    r: { x: number; y: number },
+  ) => (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+
+  const o1 = orient(a, b, c);
+  const o2 = orient(a, b, d);
+  const o3 = orient(c, d, a);
+  const o4 = orient(c, d, b);
+
+  if (o1 === 0 && pointOnSegment(a, c, b)) return true;
+  if (o2 === 0 && pointOnSegment(a, d, b)) return true;
+  if (o3 === 0 && pointOnSegment(c, a, d)) return true;
+  if (o4 === 0 && pointOnSegment(c, b, d)) return true;
+
+  return (
+    ((o1 > 0 && o2 < 0) || (o1 < 0 && o2 > 0)) &&
+    ((o3 > 0 && o4 < 0) || (o3 < 0 && o4 > 0))
+  );
+}
+
+function pointOnSegment(
+  a: { x: number; y: number },
+  p: { x: number; y: number },
+  b: { x: number; y: number },
+): boolean {
+  return (
+    p.x <= Math.max(a.x, b.x) &&
+    p.x >= Math.min(a.x, b.x) &&
+    p.y <= Math.max(a.y, b.y) &&
+    p.y >= Math.min(a.y, b.y)
+  );
+}
+
 // ── Internal helpers ──
 
 function pointInRect(point: { x: number; y: number }, bounds: Bounds): boolean {

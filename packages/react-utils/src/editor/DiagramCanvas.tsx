@@ -10,9 +10,9 @@ import {
 import { useCanvasReducer } from "./useCanvasReducer";
 import { getViewBox } from "./coordinate-utils";
 import { screenToCanvas, canvasToScreen } from "./coordinate-utils";
-import { GridBackground } from "./GridBackground";
 import { ElementRenderer } from "./ElementRenderer";
 import { SelectionOverlay } from "./SelectionOverlay";
+import { MarqueeOverlay } from "./MarqueeOverlay";
 import { ResizeHandles } from "./ResizeHandles";
 import { ConnectionPoints } from "./ConnectionPoints";
 import { ArrowPreview } from "./ArrowPreview";
@@ -26,7 +26,12 @@ import { partitionIconCatalog, type DiagramIcon } from "../icons";
 // ── Zoom limits ──
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
-const ZOOM_SENSITIVITY = 0.001;
+/** Trackpad pinch (browser sets ctrlKey without a physical Ctrl press). */
+const PINCH_ZOOM_SENSITIVITY = 0.016;
+/** Physical Ctrl/Cmd + scroll — scroll deltas are large, so keep this low. */
+const CTRL_ZOOM_SENSITIVITY = 0.003;
+/** Mouse wheel (line/page deltas, no modifier). */
+const MOUSE_ZOOM_SENSITIVITY = 0.012;
 
 export interface DiagramCanvasProps {
   /** Initial document to render (e.g. loaded from DB) */
@@ -96,6 +101,7 @@ export function DiagramCanvas({
     arrowStart,
     previewEnd,
     hoveredConnectionPoint,
+    marqueeBounds,
     spaceHeld,
     handleSize,
     // Text editing
@@ -117,17 +123,26 @@ export function DiagramCanvas({
     const svg = svgRef.current;
     if (!svg) return;
 
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
+    // Pinch synthesizes ctrlKey on wheel events; a real Ctrl/Cmd keydown does not.
+    let modKeyHeld = false;
+    const isZoomModKey = (key: string) => key === "Control" || key === "Meta";
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isZoomModKey(e.key)) modKeyHeld = true;
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (isZoomModKey(e.key)) modKeyHeld = false;
+    };
+    const onBlur = () => {
+      modKeyHeld = false;
+    };
 
+    const applyZoom = (e: WheelEvent, sensitivity: number) => {
+      const viewport = viewportRef.current;
+      const currentSize = sizeRef.current;
       const rect = svg.getBoundingClientRect();
       const pointerScreenX = e.clientX - rect.left;
       const pointerScreenY = e.clientY - rect.top;
 
-      const viewport = viewportRef.current;
-      const currentSize = sizeRef.current;
-
-      // Canvas coords under cursor before zoom
       const canvasBefore = screenToCanvas(
         pointerScreenX,
         pointerScreenY,
@@ -135,14 +150,20 @@ export function DiagramCanvas({
         { width: currentSize.width, height: currentSize.height },
       );
 
-      // Compute new zoom
-      const delta = -e.deltaY * ZOOM_SENSITIVITY;
+      const rawDelta =
+        e.deltaMode === 1
+          ? e.deltaY * 16
+          : e.deltaMode === 2
+            ? e.deltaY * 800
+            : e.deltaY;
       const newZoom = Math.min(
         MAX_ZOOM,
-        Math.max(MIN_ZOOM, viewport.zoom * (1 + delta)),
+        Math.max(
+          MIN_ZOOM,
+          viewport.zoom * Math.exp(-rawDelta * sensitivity),
+        ),
       );
 
-      // Canvas coords under cursor after zoom (with same viewport origin)
       const canvasAfter = screenToCanvas(
         pointerScreenX,
         pointerScreenY,
@@ -150,7 +171,6 @@ export function DiagramCanvas({
         { width: currentSize.width, height: currentSize.height },
       );
 
-      // Adjust viewport so the point under cursor stays fixed
       dispatchRef.current({
         type: "SET_VIEWPORT",
         viewport: {
@@ -161,8 +181,47 @@ export function DiagramCanvas({
       });
     };
 
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+
+      const viewport = viewportRef.current;
+
+      // ctrlKey on the event: pinch (synthetic) or Ctrl/Cmd+scroll (physical).
+      if (e.ctrlKey || e.metaKey) {
+        applyZoom(
+          e,
+          modKeyHeld ? CTRL_ZOOM_SENSITIVITY : PINCH_ZOOM_SENSITIVITY,
+        );
+        return;
+      }
+
+      // Mouse wheels usually report line/page mode; trackpads use pixel pan.
+      if (e.deltaMode === 1 || e.deltaMode === 2) {
+        applyZoom(e, MOUSE_ZOOM_SENSITIVITY);
+        return;
+      }
+
+      const scale = 1;
+      dispatchRef.current({
+        type: "SET_VIEWPORT",
+        viewport: {
+          ...viewport,
+          x: viewport.x + (e.deltaX * scale) / viewport.zoom,
+          y: viewport.y + (e.deltaY * scale) / viewport.zoom,
+        },
+      });
+    };
+
     svg.addEventListener("wheel", handleWheel, { passive: false });
-    return () => svg.removeEventListener("wheel", handleWheel);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      svg.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
   }, []); // svgRef is stable; refs handle changing state
 
   const viewBox = getViewBox(state.document.viewport, size.width, size.height);
@@ -269,8 +328,6 @@ export function DiagramCanvas({
           onPointerUp={handlePointerUp}
           onDoubleClick={handleDoubleClick}
         >
-          <GridBackground />
-
           {/* Elements in array order (first = bottom, last = top) */}
           {state.document.elements.map((el) => (
             <ElementRenderer
@@ -287,6 +344,9 @@ export function DiagramCanvas({
             elements={state.document.elements}
             selectedIds={state.selectedIds}
           />
+
+          {/* Marquee (box) selection preview */}
+          {marqueeBounds && <MarqueeOverlay bounds={marqueeBounds} />}
 
           {/* Resize handles for single selected element */}
           {!editingTarget &&
