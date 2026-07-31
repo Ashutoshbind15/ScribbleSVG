@@ -19,7 +19,9 @@ Both work from a serializable `DiagramDocument`. Save it as JSON, load it later,
 
 ## Documentation
 
-Fumadocs site in [`docs/`](./docs):
+Docs: [https://scribblesvg-docs.ashutoshbind.com/](https://scribblesvg-docs.ashutoshbind.com/)
+
+Source lives in [`docs/`](./docs). To run locally:
 
 ```bash
 pnpm --filter docs dev
