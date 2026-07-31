@@ -3,32 +3,47 @@ import { Keyboard, X } from "lucide-react";
 
 interface ShortcutRow {
   keys: string[];
+  /** Alternate chord shown after `/` (e.g. Ctrl+Y redo on Windows/Linux). */
+  altKeys?: string[];
   label: string;
 }
 
-function modKey(): string {
-  if (typeof navigator === "undefined") return "Ctrl";
+function isApplePlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
 
   const uaData = (
     navigator as Navigator & { userAgentData?: { platform?: string } }
   ).userAgentData;
   const hint = uaData?.platform ?? navigator.userAgent;
 
-  return /mac|iphone|ipad|ipod/i.test(hint) ? "⌘" : "Ctrl";
+  return /mac|iphone|ipad|ipod/i.test(hint);
 }
 
-function buildShortcuts(mod: string): ShortcutRow[] {
+function modKey(isApple: boolean): string {
+  return isApple ? "⌘" : "Ctrl";
+}
+
+function buildShortcuts(mod: string, isApple: boolean): ShortcutRow[] {
   return [
     { keys: ["Shift", "click"], label: "Multi-select" },
     { keys: [mod, "C"], label: "Copy" },
     { keys: [mod, "X"], label: "Cut" },
     { keys: [mod, "V"], label: "Paste" },
     { keys: [mod, "Z"], label: "Undo" },
-    { keys: [mod, "Shift", "Z"], label: "Redo" },
-    { keys: ["Del"], label: "Delete selection" },
+    {
+      keys: [mod, "Shift", "Z"],
+      // Matches useCanvasInteraction: Ctrl+Y redo on Windows/Linux only
+      ...(isApple ? {} : { altKeys: ["Ctrl", "Y"] }),
+      label: "Redo",
+    },
+    { keys: ["Del"], altKeys: ["Backspace"], label: "Delete selection" },
     { keys: ["2× click"], label: "Edit text" },
     { keys: ["?"], label: "Toggle this panel" },
   ];
+}
+
+function renderKeys(keys: string[], idPrefix: string) {
+  return keys.map((key) => <kbd key={`${idPrefix}-${key}`}>{key}</kbd>);
 }
 
 /**
@@ -37,10 +52,10 @@ function buildShortcuts(mod: string): ShortcutRow[] {
  */
 export function KeyboardShortcuts() {
   const [open, setOpen] = useState(false);
-  const [mod, setMod] = useState("Ctrl");
+  const [isApple, setIsApple] = useState(false);
 
   useEffect(() => {
-    setMod(modKey());
+    setIsApple(isApplePlatform());
   }, []);
 
   useEffect(() => {
@@ -74,7 +89,8 @@ export function KeyboardShortcuts() {
     e.stopPropagation();
   }, []);
 
-  const shortcuts = buildShortcuts(mod);
+  const mod = modKey(isApple);
+  const shortcuts = buildShortcuts(mod, isApple);
 
   return (
     <div
@@ -112,15 +128,24 @@ export function KeyboardShortcuts() {
             </button>
           </div>
           <ul className="scribblesvg-editor__shortcuts-list">
-            {shortcuts.map(({ keys, label }) => (
+            {shortcuts.map(({ keys, altKeys, label }) => (
               <li key={label}>
                 <span className="scribblesvg-editor__shortcuts-label">
                   {label}
                 </span>
                 <span className="scribblesvg-editor__shortcuts-keys">
-                  {keys.map((key) => (
-                    <kbd key={key}>{key}</kbd>
-                  ))}
+                  {renderKeys(keys, label)}
+                  {altKeys && (
+                    <>
+                      <span
+                        className="scribblesvg-editor__shortcuts-or"
+                        aria-hidden="true"
+                      >
+                        /
+                      </span>
+                      {renderKeys(altKeys, `${label}-alt`)}
+                    </>
+                  )}
                 </span>
               </li>
             ))}

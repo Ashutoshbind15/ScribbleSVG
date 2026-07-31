@@ -282,6 +282,12 @@
   flex-shrink: 0;
 }
 
+.scribblesvg-editor__shortcuts-or {
+  margin: 0 0.15rem;
+  color: var(--scribblesvg-muted);
+  font-size: 0.65rem;
+}
+
 .scribblesvg-editor__shortcuts-keys kbd {
   display: inline-flex;
   align-items: center;
