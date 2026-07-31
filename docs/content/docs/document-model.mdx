@@ -1,0 +1,54 @@
+---
+title: Document model
+description: DiagramDocument shape, elements, and serialization
+---
+
+A diagram is a plain JSON object: `DiagramDocument`. Save it, load it, and both the editor and renderer produce the same scribble strokes because each element carries a deterministic `seed`.
+
+## Document
+
+```ts
+type DiagramDocument = {
+  version: 1;
+  elements: DiagramElement[];
+  viewport: { x: number; y: number; zoom: number };
+};
+```
+
+Use `EMPTY_DOCUMENT` from `@scribblesvg/core` as a starting point. Validate untrusted JSON with `parseDiagramDocument` / `isDiagramDocument`.
+
+## Element types
+
+| Type | Role |
+| --- | --- |
+| `rectangle` | Box with optional label |
+| `circle` | Ellipse/circle with optional label |
+| `cylinder` | Database-style cylinder |
+| `diamond` | Decision / flowchart diamond |
+| `icon` | Catalog icon keyed by `iconId` |
+| `text` | Standalone text |
+| `arrow` | Connector with arrowheads |
+| `line` | Straight connector without heads |
+
+All elements share `id` (UUID) and `seed` (Rough.js determinism). Shapes store geometry (`x`/`y`/`width`/`height` or `cx`/`cy`/`radius`) and optional `text` / `fontSize`.
+
+## Connectors
+
+Arrows and lines use canvas endpoints (`startX`/`startY`/`endX`/`endY`) plus optional bindings:
+
+```ts
+startBinding?: string; // element id, or omit for free-floating
+endBinding?: string;
+```
+
+When bound, the editor keeps the endpoint attached to the target shape.
+
+## Icons
+
+Icon elements store only `iconId`. Pass a matching `icons` catalog to `DiagramCanvas` / `DiagramRenderer` so artwork resolves. Unresolved ids render a dashed “Missing icon” placeholder.
+
+Treat catalog SVG as trusted host input. Diagram JSON cannot carry SVG markup, so normal save/load is not an XSS path — do not put end-user-uploaded SVG strings into `icons` without sanitizing first.
+
+## Seeds
+
+`generateSeed()` from core creates a new stroke seed. Keeping seeds stable across sessions is what makes the scribble look identical every time you render the same document.

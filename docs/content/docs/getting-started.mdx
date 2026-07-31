@@ -1,0 +1,85 @@
+---
+title: Getting started
+description: Install ScribbleSVG and render your first diagram
+---
+
+## Install
+
+```bash
+pnpm add @scribblesvg/core @scribblesvg/react-utils
+```
+
+Peer dependencies: React 18 or 19.
+
+## Read-only preview
+
+```tsx
+import { DiagramRenderer } from "@scribblesvg/react-utils/renderer";
+import { EMPTY_DOCUMENT, type DiagramDocument } from "@scribblesvg/core";
+
+function Preview({ document }: { document: DiagramDocument }) {
+  return (
+    <DiagramRenderer
+      document={document ?? EMPTY_DOCUMENT}
+      colors={{ stroke: "#111", text: "#111" }}
+      className="w-full"
+    />
+  );
+}
+```
+
+No CSS import is required for the renderer.
+
+## Interactive editor
+
+Import the bundled editor CSS once in your app:
+
+```tsx
+import "@scribblesvg/react-utils/editor.css";
+import { useState } from "react";
+import { DiagramCanvas } from "@scribblesvg/react-utils/editor";
+import { EMPTY_DOCUMENT, type DiagramDocument } from "@scribblesvg/core";
+
+function Editor() {
+  const [document, setDocument] = useState<DiagramDocument>(EMPTY_DOCUMENT);
+
+  return (
+    <div style={{ height: 600 }}>
+      <DiagramCanvas
+        initialDocument={document}
+        onChange={setDocument}
+      />
+    </div>
+  );
+}
+```
+
+The editor fills its container (`height: 100%`). Give the wrapper (or `className` on `DiagramCanvas`) a bounded height.
+
+## Validate JSON
+
+On the server or in tooling, parse saved diagrams with core:
+
+```ts
+import { parseDiagramDocument } from "@scribblesvg/core";
+
+const document = parseDiagramDocument(JSON.parse(raw));
+```
+
+## Monorepo apps
+
+This repo also ships Vite apps for local demos:
+
+```bash
+pnpm install
+pnpm dev          # drawing site
+pnpm dev:playground
+```
+
+Docs site (this package):
+
+```bash
+pnpm --filter docs dev
+```
+
+Open [http://localhost:4000](http://localhost:4000).

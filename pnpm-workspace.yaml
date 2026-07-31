@@ -1,6 +1,9 @@
 packages:
   - "packages/*"
   - "apps/*"
+  - "docs"
 minimumReleaseAge: 7200
+minimumReleaseAgeExclude:
+  - "@scribblesvg/*"
 saveExact: true
 trustPolicy: no-downgrade

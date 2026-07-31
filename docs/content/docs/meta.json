@@ -1,0 +1,13 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "getting-started",
+    "document-model",
+    "core",
+    "react-utils",
+    "editor",
+    "renderer",
+    "changelog"
+  ]
+}

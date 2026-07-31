@@ -1,0 +1,33 @@
+---
+title: "@scribblesvg/react-utils"
+description: React components for diagram display and editing
+---
+
+**@scribblesvg/react-utils** provides React surfaces over `@scribblesvg/core`:
+
+- [`DiagramCanvas`](/docs/editor) — interactive editor
+- [`DiagramRenderer`](/docs/renderer) — read-only SVG view
+
+## Install
+
+```bash
+pnpm add @scribblesvg/react-utils @scribblesvg/core
+```
+
+Peer dependencies: React 18 or 19.
+
+## Subpath exports
+
+| Import | Contents |
+| --- | --- |
+| `@scribblesvg/react-utils/editor.css` | Built-in styles for `DiagramCanvas` |
+| `@scribblesvg/react-utils/renderer` | `DiagramRenderer`, color presets and helpers |
+| `@scribblesvg/react-utils/editor` | `DiagramCanvas`, toolbar, hooks, hit-testing |
+| `@scribblesvg/react-utils/icons` | `DiagramIcon`, `resolveDiagramIcon`, catalog helpers |
+| `@scribblesvg/react-utils/colors` | `DiagramColors`, `resolveDiagramColors`, presets |
+
+The editor entry also exports lower-level pieces if you want to build your own UI: `useCanvasReducer`, interaction hooks, coordinate utils, hit testing.
+
+## License
+
+MIT

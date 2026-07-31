@@ -1,0 +1,31 @@
+---
+title: Overview
+description: What ScribbleSVG is and how the packages fit together
+---
+
+**ScribbleSVG** is a lightweight, SVG-based toolkit for basic diagrams and sketches with a hand-drawn scribble style. Diagrams are a serializable `DiagramDocument` — save as JSON, load later, and strokes stay consistent via per-shape seeds.
+
+## Packages
+
+| Package | Description |
+| --- | --- |
+| **[@scribblesvg/core](/docs/core)** | Types, geometry, validation, and rendering primitives |
+| **[@scribblesvg/react-utils](/docs/react-utils)** | React editor (`DiagramCanvas`) and read-only view (`DiagramRenderer`) |
+
+## Canvas & renderer
+
+`DiagramCanvas` is the interactive editor: pan, zoom, draw shapes, connect arrows, and edit text.
+
+`DiagramRenderer` is a read-only view that turns the same document into SVG — useful anywhere you need to display a diagram without the editor chrome.
+
+Both work from the same document model. Each shape carries a seed so its hand-drawn strokes stay consistent across sessions and surfaces.
+
+## Where to go next
+
+<Cards>
+  <Card title="Getting started" href="/docs/getting-started" description="Install the packages and render your first diagram" />
+  <Card title="Document model" href="/docs/document-model" description="DiagramDocument shape and element types" />
+  <Card title="Editor" href="/docs/editor" description="DiagramCanvas props, CSS, and icons" />
+  <Card title="Renderer" href="/docs/renderer" description="Read-only SVG output and color presets" />
+  <Card title="Changelog" href="/docs/changelog" description="Recent package versions" />
+</Cards>

@@ -1,0 +1,56 @@
+---
+title: "@scribblesvg/core"
+description: Diagram types, geometry, validation, and SVG rendering primitives
+---
+
+Use **@scribblesvg/core** when you need the data model and rendering logic without React — for example validating saved JSON on the server or generating SVG paths elsewhere.
+
+## Install
+
+```bash
+pnpm add @scribblesvg/core
+```
+
+## What's included
+
+- **Types** — `DiagramDocument`, shape/connector elements, viewport
+- **Validation** — `parseDiagramDocument`, `isDiagramDocument`
+- **Geometry** — bounds, connection points, anchors
+- **Rendering** — SVG path data for scribble-style shapes (`getElementRoughPaths`)
+- **Constants & seeds** — `EMPTY_DOCUMENT`, `generateSeed`
+
+For interactive editing and read-only display in React, see [@scribblesvg/react-utils](/docs/react-utils).
+
+## Example
+
+```ts
+import {
+  EMPTY_DOCUMENT,
+  generateSeed,
+  parseDiagramDocument,
+  type DiagramDocument,
+  type RectangleElement,
+} from "@scribblesvg/core";
+
+const rect: RectangleElement = {
+  id: crypto.randomUUID(),
+  type: "rectangle",
+  seed: generateSeed(),
+  x: 40,
+  y: 40,
+  width: 160,
+  height: 80,
+  text: "Hello",
+};
+
+const document: DiagramDocument = {
+  ...EMPTY_DOCUMENT,
+  elements: [rect],
+};
+
+const again = parseDiagramDocument(JSON.parse(JSON.stringify(document)));
+```
+
+## License
+
+MIT

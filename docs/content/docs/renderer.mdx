@@ -1,0 +1,48 @@
+---
+title: DiagramRenderer
+description: Read-only SVG output for a DiagramDocument
+---
+
+`DiagramRenderer` turns a `DiagramDocument` into a single `<svg>`. Wrap and style it in your own markup. No CSS import required.
+
+```tsx
+import { DiagramRenderer } from "@scribblesvg/react-utils/renderer";
+import type { DiagramDocument } from "@scribblesvg/core";
+import type { DiagramIcon } from "@scribblesvg/react-utils/icons";
+
+function Preview({
+  document,
+  icons,
+}: {
+  document: DiagramDocument;
+  icons?: DiagramIcon[];
+}) {
+  return (
+    <article className="my-site-card">
+      <DiagramRenderer
+        document={document}
+        icons={icons}
+        colors={{ stroke: "#111", text: "#111" }}
+        className="w-full"
+      />
+    </article>
+  );
+}
+```
+
+## Colors
+
+Diagram colors are set via `colors` / `colorPreset`.
+
+Presets:
+
+- `inherit` — follows `currentColor`
+- `light`
+- `dark`
+- `darkBlue`
+
+Override individual colors with the `colors` prop. Helpers live under `@scribblesvg/react-utils/colors` and `@scribblesvg/react-utils/renderer`.
+
+## Icons
+
+Same catalog model as the editor: pass `icons` so `iconId` values resolve. Missing icons show a dashed placeholder.

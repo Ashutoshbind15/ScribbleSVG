@@ -17,6 +17,16 @@ A lightweight, SVG-based toolkit for creating basic diagrams and sketches with a
 
 Both work from a serializable `DiagramDocument`. Save it as JSON, load it later, and the diagram renders the same way every time. Each shape carries a seed so its hand-drawn strokes stay consistent across sessions and surfaces.
 
+## Documentation
+
+Fumadocs site in [`docs/`](./docs):
+
+```bash
+pnpm --filter docs dev
+```
+
+Open [http://localhost:4000](http://localhost:4000).
+
 ## License
 
 MIT

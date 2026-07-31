@@ -1,0 +1,64 @@
+---
+title: DiagramCanvas
+description: Interactive scribble diagram editor for React
+---
+
+`DiagramCanvas` is the interactive editor: pan, zoom, shapes, arrows/lines, resize, and text. Import the bundled CSS once in your CMS or admin app.
+
+```tsx
+import "@scribblesvg/react-utils/editor.css";
+import { useState } from "react";
+import { DiagramCanvas } from "@scribblesvg/react-utils/editor";
+import type { DiagramIcon } from "@scribblesvg/react-utils/icons";
+import { EMPTY_DOCUMENT, type DiagramDocument } from "@scribblesvg/core";
+
+const icons: DiagramIcon[] = [
+  {
+    iconId: "server",
+    label: "Server",
+    svg: `<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" /></svg>`,
+  },
+];
+
+function Editor() {
+  const [document, setDocument] = useState<DiagramDocument>(EMPTY_DOCUMENT);
+
+  return (
+    <div className="diagram-editor-panel">
+      <DiagramCanvas
+        initialDocument={document}
+        onChange={setDocument}
+        icons={icons}
+      />
+    </div>
+  );
+}
+```
+
+## Layout
+
+The editor fills its container (`height: 100%`). Give it a bounded height with your own class — on a wrapper or on `DiagramCanvas` via `className`:
+
+```css
+.diagram-editor-panel {
+  height: 600px;
+}
+```
+
+```tsx
+<div className="diagram-editor-panel">
+  <DiagramCanvas onChange={save} />
+</div>
+
+<DiagramCanvas className="diagram-editor-panel" onChange={save} />
+```
+
+## Icons
+
+Documents store only `iconId` on icon elements. Pass the matching `icons` array so artwork can resolve. Unresolved ids render a dashed “Missing icon” placeholder.
+
+Treat catalog SVG as trusted host input (your bundled pack or admin-curated markup). Do not put end-user-uploaded SVG strings into `icons` without sanitizing first.
+
+## Persistence
+
+Use `onChange` to keep the document in sync (e.g. save to your backend). The document is plain JSON from `@scribblesvg/core` — see [Document model](/docs/document-model).
