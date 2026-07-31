@@ -5,6 +5,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "pnpm --filter site dev",
+    "dev:site": "pnpm --filter site dev",
+    "dev:playground": "pnpm --filter playground dev",
     "build": "pnpm -r run build",
     "clean": "pnpm -r run clean",
     "typecheck": "pnpm -r run typecheck",
