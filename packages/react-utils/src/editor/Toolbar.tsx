@@ -1,15 +1,16 @@
-import {
-  MousePointer2,
-  Square,
-  Circle,
-  Cylinder,
-  Diamond,
-  Minus,
-  Type,
-  ArrowUpRight,
-} from "lucide-react";
 import { parseIconSvg, type DiagramIcon } from "../icons";
 import type { ToolType } from "./useCanvasReducer";
+import {
+  ArrowIcon,
+  CircleIcon,
+  CylinderIcon,
+  DiamondIcon,
+  LineIcon,
+  RectangleIcon,
+  SelectIcon,
+  TextIcon,
+  type ToolbarIconProps,
+} from "./toolbarIcons";
 
 interface ToolbarProps {
   activeTool: ToolType;
@@ -22,16 +23,16 @@ interface ToolbarProps {
 const BUILTIN_TOOLS: {
   type: Exclude<ToolType, "icon">;
   label: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  Icon: React.ComponentType<ToolbarIconProps>;
 }[] = [
-  { type: "select", label: "Select", Icon: MousePointer2 },
-  { type: "rectangle", label: "Rectangle", Icon: Square },
-  { type: "circle", label: "Circle", Icon: Circle },
-  { type: "cylinder", label: "Cylinder", Icon: Cylinder },
-  { type: "diamond", label: "Diamond", Icon: Diamond },
-  { type: "text", label: "Text", Icon: Type },
-  { type: "line", label: "Line", Icon: Minus },
-  { type: "arrow", label: "Arrow", Icon: ArrowUpRight },
+  { type: "select", label: "Select", Icon: SelectIcon },
+  { type: "rectangle", label: "Rectangle", Icon: RectangleIcon },
+  { type: "circle", label: "Circle", Icon: CircleIcon },
+  { type: "cylinder", label: "Cylinder", Icon: CylinderIcon },
+  { type: "diamond", label: "Diamond", Icon: DiamondIcon },
+  { type: "text", label: "Text", Icon: TextIcon },
+  { type: "line", label: "Line", Icon: LineIcon },
+  { type: "arrow", label: "Arrow", Icon: ArrowIcon },
 ];
 
 /**

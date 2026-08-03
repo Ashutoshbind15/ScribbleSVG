@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Redo2, Undo2 } from "lucide-react";
+import { RedoIcon, UndoIcon } from "./toolbarIcons";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
@@ -297,7 +297,7 @@ export function DiagramCanvas({
             disabled={state.past.length === 0}
             onClick={() => dispatch({ type: "UNDO" })}
           >
-            <Undo2 />
+            <UndoIcon />
           </button>
           <button
             type="button"
@@ -306,7 +306,7 @@ export function DiagramCanvas({
             disabled={state.future.length === 0}
             onClick={() => dispatch({ type: "REDO" })}
           >
-            <Redo2 />
+            <RedoIcon />
           </button>
         </div>
         <KeyboardShortcuts />

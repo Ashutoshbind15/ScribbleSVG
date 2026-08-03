@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Keyboard, X } from "lucide-react";
+import { CloseIcon, KeyboardIcon } from "./toolbarIcons";
 
 interface ShortcutRow {
   keys: string[];
@@ -114,7 +114,7 @@ export function KeyboardShortcuts() {
         aria-pressed={open}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <Keyboard />
+        <KeyboardIcon />
       </button>
 
       {open && (
@@ -131,7 +131,7 @@ export function KeyboardShortcuts() {
               aria-label="Close shortcuts"
               onClick={() => setOpen(false)}
             >
-              <X />
+              <CloseIcon />
             </button>
           </div>
           <ul className="scribblesvg-editor__shortcuts-list">

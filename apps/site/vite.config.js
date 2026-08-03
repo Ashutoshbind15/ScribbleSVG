@@ -8,7 +8,7 @@ import {
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    // pnpm can nest a second React under react-utils/lucide; force one copy.
+    // Force a single React copy across workspace packages.
     dedupe: ["react", "react-dom"],
     alias: workspacePackageAliases,
   },

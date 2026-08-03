@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { MinusIcon, PlusIcon } from "./toolbarIcons";
 
 interface FontSizePopupProps {
   /** Current font size of the target element/label */
@@ -104,7 +104,7 @@ export function FontSizePopup({
         aria-label="Decrease font size"
         onClick={() => handleStep(-STEP)}
       >
-        <Minus />
+        <MinusIcon />
       </button>
       <input
         type="number"
@@ -133,7 +133,7 @@ export function FontSizePopup({
         aria-label="Increase font size"
         onClick={() => handleStep(STEP)}
       >
-        <Plus />
+        <PlusIcon />
       </button>
     </div>
   );

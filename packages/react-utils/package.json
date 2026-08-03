@@ -69,8 +69,7 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
-    "@scribblesvg/core": "workspace:*",
-    "lucide-react": "1.7.0"
+    "@scribblesvg/core": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "19.2.14",
