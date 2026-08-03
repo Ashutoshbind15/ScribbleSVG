@@ -13,7 +13,13 @@ const App = () => {
     <div className="site">
       <header className="site-header">
         <div className="site-brand">
-          <span className="site-logo">ScribbleSVG</span>
+          <img
+            className="site-mark"
+            src="/brand/ssvg.svg"
+            alt="ScribbleSVG"
+            width={120}
+            height={56}
+          />
         </div>
         <div className="site-actions">
           <button
@@ -35,10 +41,26 @@ const App = () => {
         </div>
       </header>
       <main className="site-main">
-        <DiagramCanvas
-          initialDocument={document}
-          onChange={setDocument}
-        />
+        <div className="site-canvas">
+          <DiagramCanvas
+            initialDocument={document}
+            onChange={setDocument}
+          />
+          {!hasContent && (
+            <div className="site-empty" aria-hidden="true">
+              <img
+                className="site-empty__wordmark"
+                src="/brand/scribblesvg.svg"
+                alt=""
+                width={280}
+                height={54}
+              />
+              <p className="site-empty__hint">
+                Start drawing on the lightweight canvas.
+              </p>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

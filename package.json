@@ -13,7 +13,8 @@
     "build:docs": "pnpm --filter docs build",
     "clean": "pnpm -r run clean",
     "typecheck": "pnpm -r run typecheck",
-    "test": "node --import tsx --test --test-reporter=spec tests/**/*.test.ts"
+    "test": "node --import tsx --test --test-reporter=spec tests/**/*.test.ts",
+    "brand:generate": "node utils/brand/generate-wordmarks.mjs"
   },
   "keywords": [],
   "author": "",

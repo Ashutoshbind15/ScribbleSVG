@@ -1,10 +1,12 @@
 import Link from 'next/link';
+import { BrandWordmark } from '@/components/brand';
 
 export default function HomePage() {
   return (
     <div className="flex flex-col justify-center flex-1 px-6 py-16 max-w-2xl mx-auto">
-      <p className="text-sm text-fd-muted-foreground mb-3">v0.2.1</p>
-      <h1 className="text-3xl font-semibold tracking-tight mb-3">ScribbleSVG</h1>
+      <p className="text-sm text-fd-muted-foreground mb-5">v0.2.1</p>
+      <BrandWordmark className="mb-5" />
+      <h1 className="sr-only">ScribbleSVG</h1>
       <p className="text-fd-muted-foreground text-lg mb-8 leading-relaxed">
         Lightweight SVG toolkit for hand-drawn diagrams. Serialize a document as
         JSON, edit it with React, or render it read-only anywhere.
