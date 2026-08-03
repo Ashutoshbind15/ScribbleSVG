@@ -1,6 +1,6 @@
 # ScribbleSVG
 
-A lightweight, SVG-based toolkit for creating basic diagrams and sketches with a hand-drawn scribble style.
+A lightweight, low-dependency SVG toolkit for basic diagrams and sketches with a hand-drawn scribble style.
 
 ## Packages
 

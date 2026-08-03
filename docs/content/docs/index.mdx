@@ -3,7 +3,19 @@ title: Overview
 description: What ScribbleSVG is and how the packages fit together
 ---
 
-**ScribbleSVG** is a lightweight, SVG-based toolkit for basic diagrams and sketches with a hand-drawn scribble style. Diagrams are a serializable `DiagramDocument` — save as JSON, load later, and strokes stay consistent via per-shape seeds.
+**ScribbleSVG** is a lightweight, low-dependency SVG toolkit for basic diagrams and sketches with a hand-drawn scribble style. Diagrams are a serializable `DiagramDocument` — save as JSON, load later, and strokes stay consistent via per-shape seeds.
+
+## Size
+
+Measured client entry points (esbuild minify, React / ReactDOM external, CSS not counted):
+
+| Entry | Minified | Gzip |
+| --- | --- | --- |
+| `@scribblesvg/react-utils/editor` | ~72 KB | ~24 KB |
+| `@scribblesvg/react-utils/renderer` | ~33 KB | ~11 KB |
+| `@scribblesvg/core` | ~33 KB | ~11 KB |
+
+Import the editor and renderer from those subpaths so hosts only pull what they use. React is a peer dependency (not included above). Runtime hard deps are intentionally small: **roughjs** in core for the scribble look; **react-utils** depends only on core.
 
 ## Packages
 

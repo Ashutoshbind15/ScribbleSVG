@@ -8,8 +8,9 @@ export default function HomePage() {
       <BrandWordmark className="mb-5" />
       <h1 className="sr-only">ScribbleSVG</h1>
       <p className="text-fd-muted-foreground text-lg mb-8 leading-relaxed">
-        Lightweight SVG toolkit for hand-drawn diagrams. Serialize a document as
-        JSON, edit it with React, or render it read-only anywhere.
+        Lightweight, low-dependency SVG toolkit for hand-drawn diagrams — editor
+        ~24&nbsp;KB gzip, renderer ~11&nbsp;KB gzip (React as a peer). Serialize
+        a document as JSON, edit it with React, or render it read-only anywhere.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link
