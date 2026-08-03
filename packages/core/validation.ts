@@ -1,144 +1,192 @@
-import { z } from "zod";
-import type { DiagramDocument } from "./types";
+import type { DiagramDocument, DiagramElement, Viewport } from "./types";
 
-// ── Element schemas ──
+// ── Primitives ──
 
-const RectangleElementSchema = z.object({
-  id: z.string(),
-  type: z.literal("rectangle"),
-  seed: z.number(),
-  x: z.number(),
-  y: z.number(),
-  width: z.number(),
-  height: z.number(),
-  text: z.string().optional(),
-  fontSize: z.number().optional(),
-});
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-const CircleElementSchema = z.object({
-  id: z.string(),
-  type: z.literal("circle"),
-  seed: z.number(),
-  cx: z.number(),
-  cy: z.number(),
-  radius: z.number(),
-  text: z.string().optional(),
-  fontSize: z.number().optional(),
-});
+/** Finite numbers only (rejects NaN / ±Infinity). */
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
 
-const CylinderElementSchema = z.object({
-  id: z.string(),
-  type: z.literal("cylinder"),
-  seed: z.number(),
-  x: z.number(),
-  y: z.number(),
-  width: z.number(),
-  height: z.number(),
-  text: z.string().optional(),
-  fontSize: z.number().optional(),
-});
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
 
-const DiamondElementSchema = z.object({
-  id: z.string(),
-  type: z.literal("diamond"),
-  seed: z.number(),
-  x: z.number(),
-  y: z.number(),
-  width: z.number(),
-  height: z.number(),
-  text: z.string().optional(),
-  fontSize: z.number().optional(),
-});
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || isString(value);
+}
 
-const IconElementSchema = z.object({
-  id: z.string(),
-  type: z.literal("icon"),
-  seed: z.number(),
-  iconId: z.string(),
-  x: z.number(),
-  y: z.number(),
-  width: z.number(),
-  height: z.number(),
-  text: z.string().optional(),
-  fontSize: z.number().optional(),
-});
+function isOptionalNumber(value: unknown): boolean {
+  return value === undefined || isNumber(value);
+}
 
-const TextElementSchema = z.object({
-  id: z.string(),
-  type: z.literal("text"),
-  seed: z.number(),
-  x: z.number(),
-  y: z.number(),
-  text: z.string(),
-  fontSize: z.number().optional(),
-  width: z.number().optional(),
-  height: z.number().optional(),
-});
+function hasBaseFields(value: Record<string, unknown>): boolean {
+  return isString(value.id) && isNumber(value.seed);
+}
 
-const ArrowElementSchema = z.object({
-  id: z.string(),
-  type: z.literal("arrow"),
-  seed: z.number(),
-  startX: z.number(),
-  startY: z.number(),
-  endX: z.number(),
-  endY: z.number(),
-  startBinding: z.string().optional(),
-  endBinding: z.string().optional(),
-});
+// ── Element checks ──
 
-const LineElementSchema = z.object({
-  id: z.string(),
-  type: z.literal("line"),
-  seed: z.number(),
-  startX: z.number(),
-  startY: z.number(),
-  endX: z.number(),
-  endY: z.number(),
-  startBinding: z.string().optional(),
-  endBinding: z.string().optional(),
-});
+function isRectangleElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "rectangle" &&
+    hasBaseFields(value) &&
+    isNumber(value.x) &&
+    isNumber(value.y) &&
+    isNumber(value.width) &&
+    isNumber(value.height) &&
+    isOptionalString(value.text) &&
+    isOptionalNumber(value.fontSize)
+  );
+}
 
-const DiagramElementSchema = z.discriminatedUnion("type", [
-  RectangleElementSchema,
-  CircleElementSchema,
-  CylinderElementSchema,
-  DiamondElementSchema,
-  IconElementSchema,
-  TextElementSchema,
-  ArrowElementSchema,
-  LineElementSchema,
-]);
+function isCircleElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "circle" &&
+    hasBaseFields(value) &&
+    isNumber(value.cx) &&
+    isNumber(value.cy) &&
+    isNumber(value.radius) &&
+    isOptionalString(value.text) &&
+    isOptionalNumber(value.fontSize)
+  );
+}
 
-// ── Viewport schema ──
+function isCylinderElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "cylinder" &&
+    hasBaseFields(value) &&
+    isNumber(value.x) &&
+    isNumber(value.y) &&
+    isNumber(value.width) &&
+    isNumber(value.height) &&
+    isOptionalString(value.text) &&
+    isOptionalNumber(value.fontSize)
+  );
+}
 
-const ViewportSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-  zoom: z.number(),
-});
+function isDiamondElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "diamond" &&
+    hasBaseFields(value) &&
+    isNumber(value.x) &&
+    isNumber(value.y) &&
+    isNumber(value.width) &&
+    isNumber(value.height) &&
+    isOptionalString(value.text) &&
+    isOptionalNumber(value.fontSize)
+  );
+}
 
-// ── Document schema ──
+function isIconElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "icon" &&
+    hasBaseFields(value) &&
+    isString(value.iconId) &&
+    isNumber(value.x) &&
+    isNumber(value.y) &&
+    isNumber(value.width) &&
+    isNumber(value.height) &&
+    isOptionalString(value.text) &&
+    isOptionalNumber(value.fontSize)
+  );
+}
 
-const DiagramDocumentSchema = z.object({
-  version: z.literal(1),
-  viewport: ViewportSchema,
-  elements: z.array(DiagramElementSchema),
-});
+function isTextElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "text" &&
+    hasBaseFields(value) &&
+    isNumber(value.x) &&
+    isNumber(value.y) &&
+    isString(value.text) &&
+    isOptionalNumber(value.fontSize) &&
+    isOptionalNumber(value.width) &&
+    isOptionalNumber(value.height)
+  );
+}
+
+function isArrowElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "arrow" &&
+    hasBaseFields(value) &&
+    isNumber(value.startX) &&
+    isNumber(value.startY) &&
+    isNumber(value.endX) &&
+    isNumber(value.endY) &&
+    isOptionalString(value.startBinding) &&
+    isOptionalString(value.endBinding)
+  );
+}
+
+function isLineElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "line" &&
+    hasBaseFields(value) &&
+    isNumber(value.startX) &&
+    isNumber(value.startY) &&
+    isNumber(value.endX) &&
+    isNumber(value.endY) &&
+    isOptionalString(value.startBinding) &&
+    isOptionalString(value.endBinding)
+  );
+}
+
+function isDiagramElement(value: unknown): value is DiagramElement {
+  if (!isRecord(value)) return false;
+
+  switch (value.type) {
+    case "rectangle":
+      return isRectangleElement(value);
+    case "circle":
+      return isCircleElement(value);
+    case "cylinder":
+      return isCylinderElement(value);
+    case "diamond":
+      return isDiamondElement(value);
+    case "icon":
+      return isIconElement(value);
+    case "text":
+      return isTextElement(value);
+    case "arrow":
+      return isArrowElement(value);
+    case "line":
+      return isLineElement(value);
+    default:
+      return false;
+  }
+}
+
+function isViewport(value: unknown): value is Viewport {
+  return (
+    isRecord(value) &&
+    isNumber(value.x) &&
+    isNumber(value.y) &&
+    isNumber(value.zoom)
+  );
+}
 
 // ── Public API ──
-
-/**
- * Parse and validate an unknown payload as a DiagramDocument.
- * Throws ZodError if the payload is invalid.
- */
-export function parseDiagramDocument(data: unknown): DiagramDocument {
-  return DiagramDocumentSchema.parse(data) as DiagramDocument;
-}
 
 /**
  * Type guard: returns true if the payload is a valid DiagramDocument.
  */
 export function isDiagramDocument(data: unknown): data is DiagramDocument {
-  return DiagramDocumentSchema.safeParse(data).success;
+  if (!isRecord(data)) return false;
+  if (data.version !== 1) return false;
+  if (!isViewport(data.viewport)) return false;
+  if (!Array.isArray(data.elements)) return false;
+  return data.elements.every(isDiagramElement);
+}
+
+/**
+ * Parse and validate an unknown payload as a DiagramDocument.
+ * Throws if the payload is invalid.
+ */
+export function parseDiagramDocument(data: unknown): DiagramDocument {
+  if (!isDiagramDocument(data)) {
+    throw new Error("Invalid DiagramDocument");
+  }
+  return data;
 }

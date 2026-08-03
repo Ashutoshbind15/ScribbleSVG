@@ -50,7 +50,6 @@
     "typescript": "6.0.2"
   },
   "dependencies": {
-    "roughjs": "4.6.6",
-    "zod": "4.3.6"
+    "roughjs": "4.6.6"
   }
 }

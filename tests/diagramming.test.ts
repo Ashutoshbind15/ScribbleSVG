@@ -267,6 +267,7 @@ describe("@scribblesvg/core", () => {
   test("rejects invalid diagram documents", () => {
     assert.equal(isDiagramDocument({}), false);
     assert.equal(isDiagramDocument(null), false);
+    assert.equal(isDiagramDocument([]), false);
     assert.equal(isDiagramDocument("not an object"), false);
     assert.equal(isDiagramDocument({ version: 2 }), false);
 
@@ -291,6 +292,49 @@ describe("@scribblesvg/core", () => {
             y: 0,
             width: 10,
             height: 10,
+          },
+        ],
+      }),
+    );
+    // Non-finite numbers and wrong optional types must not pass
+    assert.equal(
+      isDiagramDocument({
+        version: 1,
+        viewport: { x: 0, y: 0, zoom: Number.NaN },
+        elements: [],
+      }),
+      false,
+    );
+    assert.equal(
+      isDiagramDocument({
+        version: 1,
+        viewport: { x: 0, y: 0, zoom: 1 },
+        elements: {
+          id: "not-an-array",
+          type: "rectangle",
+          seed: 1,
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+        },
+      }),
+      false,
+    );
+    assert.throws(() =>
+      parseDiagramDocument({
+        version: 1,
+        viewport: { x: 0, y: 0, zoom: 1 },
+        elements: [
+          {
+            id: "rect-bad-optional",
+            type: "rectangle",
+            seed: 1,
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+            text: null,
           },
         ],
       }),
