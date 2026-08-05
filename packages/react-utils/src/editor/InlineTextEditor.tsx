@@ -55,7 +55,7 @@ export function InlineTextEditor({
   const isShapeLabel = target.kind === "shape-label";
 
   // Auto-resize the textarea to fit its content (shape labels only —
-  // standalone text has a fixed, user-resizable box via CSS `resize`).
+  // standalone text box tracks glyph metrics; no scrollbar clipping).
   const autoGrow = useCallback(() => {
     if (!isShapeLabel) return;
     const textarea = textareaRef.current;
@@ -164,6 +164,7 @@ export function InlineTextEditor({
     );
   }
 
+  // Standalone text: box tracks glyph metrics. No scrollbar — keep overflow previewable.
   return (
     <foreignObject
       x={target.x}
@@ -186,15 +187,15 @@ export function InlineTextEditor({
           fontSize: `${target.fontSize}px`,
           fontFamily: "'Segoe UI', system-ui, sans-serif",
           lineHeight: "1.2",
-          padding: "0",
+          padding: "2px",
           margin: "0",
           border: "2px solid var(--color-primary, #3b82f6)",
           borderRadius: "2px",
           background: "rgba(255, 255, 255, 0.95)",
           color: "inherit",
           outline: "none",
-          resize: "both",
-          overflow: "auto",
+          resize: "none",
+          overflow: "visible",
           boxSizing: "border-box",
           textAlign: "left",
         }}

@@ -4,6 +4,7 @@ import {
   getElementBounds,
   getElementRoughPaths,
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
+  TEXT_LINE_HEIGHT,
   type DiagramDocument,
   type DiagramElement,
 } from "@scribblesvg/core";
@@ -30,7 +31,6 @@ export type { DiagramIcon } from "./icons";
 const DIAGRAM_PADDING = 24;
 const EMPTY_STATE_WIDTH = 240;
 const EMPTY_STATE_HEIGHT = 140;
-const LINE_HEIGHT = 1.2;
 
 function renderTextElement(
   element: DiagramElement,
@@ -39,7 +39,7 @@ function renderTextElement(
 ) {
   if (element.type === "text") {
     const fontSize = element.fontSize ?? 16;
-    const lineHeight = fontSize * LINE_HEIGHT;
+    const lineHeight = fontSize * TEXT_LINE_HEIGHT;
     const baselineY = element.y + fontSize;
 
     return (
@@ -64,7 +64,7 @@ function renderTextElement(
   }
 
   const fontSize = element.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE;
-  const lineHeight = fontSize * LINE_HEIGHT;
+  const lineHeight = fontSize * TEXT_LINE_HEIGHT;
   const lines = element.text.split("\n");
   const totalHeight = lineHeight * lines.length;
   const startDy = -(totalHeight / 2) + lineHeight / 2;

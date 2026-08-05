@@ -20,6 +20,28 @@ export interface Point {
   y: number;
 }
 
+/** Must stay in sync with TextRenderer line height. */
+export const TEXT_LINE_HEIGHT = 1.2;
+/** Average glyph width as a fraction of fontSize (proportional UI fonts). */
+export const TEXT_CHAR_WIDTH = 0.6;
+
+/**
+ * Approximate intrinsic size of standalone text for bounds / hit-testing.
+ * Kept in core so selection, resize, and export share one metric.
+ */
+export function measureTextSize(
+  text: string,
+  fontSize: number,
+): { width: number; height: number } {
+  const lines = text.split("\n");
+  const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
+  const lineCount = Math.max(lines.length, 1);
+  return {
+    width: maxLineLength * fontSize * TEXT_CHAR_WIDTH,
+    height: fontSize * TEXT_LINE_HEIGHT * lineCount,
+  };
+}
+
 /**
  * Four vertices of a diamond (N, E, S, W) from its circumscribing AABB.
  */
@@ -53,18 +75,13 @@ export function getElementBounds(el: DiagramElement): Bounds {
       };
 
     case "text": {
-      if (el.width != null && el.height != null) {
-        return { x: el.x, y: el.y, width: el.width, height: el.height };
-      }
+      // Always size to content so the selection/resize box tracks glyphs.
+      // Stored width/height are kept in sync by resize / font-size updates
+      // but must not outrank the live text metrics (they drift when font
+      // size changes independently of the box).
       const fontSize = el.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
-      // Split by newlines for multi-line text bounds
-      const lines = el.text.split("\n");
-      const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
-      const lineCount = lines.length;
-      // Approximate text dimensions based on character count and font size
-      const width = maxLineLength * fontSize * 0.6;
-      const height = fontSize * 1.2 * lineCount;
-      return { x: el.x, y: el.y, width, height };
+      const size = measureTextSize(el.text, fontSize);
+      return { x: el.x, y: el.y, width: size.width, height: size.height };
     }
 
     case "arrow":

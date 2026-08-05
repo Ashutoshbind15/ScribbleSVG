@@ -6,6 +6,7 @@ import {
   getElementBounds,
   isBindable,
   isConnector,
+  measureTextSize,
   type Bounds,
   type CircleElement,
   type CylinderElement,
@@ -348,16 +349,17 @@ export function useCanvasInteraction(
   // ── Open inline text editor for an element ──
   const openTextEditor = useCallback((element: DiagramElement) => {
     if (element.type === "text") {
-      const bounds = getElementBounds(element);
+      const fontSize = element.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
+      const size = measureTextSize(element.text, fontSize);
       setEditingTarget({
         elementId: element.id,
         kind: "standalone-text",
         text: element.text,
         x: element.x,
         y: element.y,
-        width: Math.max(bounds.width, 100),
-        height: Math.max(bounds.height, 24),
-        fontSize: element.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
+        width: Math.max(size.width, 60),
+        height: Math.max(size.height, 24),
+        fontSize,
       });
     } else if (
       element.type === "rectangle" ||
@@ -391,10 +393,20 @@ export function useCanvasInteraction(
           // Empty standalone text → delete the element
           dispatch({ type: "DELETE_ELEMENTS", ids: [elementId] });
         } else {
+          const existing = elements.find((el) => el.id === elementId);
+          const fontSize =
+            existing && existing.type === "text"
+              ? (existing.fontSize ?? DEFAULT_TEXT_FONT_SIZE)
+              : DEFAULT_TEXT_FONT_SIZE;
+          const size = measureTextSize(trimmedText, fontSize);
           dispatch({
             type: "UPDATE_ELEMENT",
             id: elementId,
-            patch: { text: trimmedText },
+            patch: {
+              text: trimmedText,
+              width: size.width,
+              height: size.height,
+            },
           });
         }
       } else {
@@ -409,7 +421,7 @@ export function useCanvasInteraction(
       endTextHistoryGroup();
       setEditingTarget(null);
     },
-    [dispatch, endTextHistoryGroup],
+    [dispatch, endTextHistoryGroup, elements],
   );
 
   // ── Cancel text editing ──

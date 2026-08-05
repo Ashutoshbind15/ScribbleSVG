@@ -3,6 +3,8 @@
  * Supports multi-line text by splitting on newlines and rendering with <tspan> elements.
  */
 
+import { TEXT_LINE_HEIGHT } from "@scribblesvg/core";
+
 interface StandaloneTextProps {
   /** Render mode for standalone text elements */
   mode: "standalone";
@@ -25,9 +27,6 @@ interface ShapeLabelProps {
 
 type TextRendererProps = StandaloneTextProps | ShapeLabelProps;
 
-/** Line height multiplier relative to fontSize */
-const LINE_HEIGHT = 1.2;
-
 /**
  * Renders multi-line text as SVG `<text>` with `<tspan>` elements.
  * - Standalone text: positioned at (x, y), left-aligned
@@ -36,7 +35,7 @@ const LINE_HEIGHT = 1.2;
 export function TextRenderer(props: TextRendererProps) {
   const lines = props.text.split("\n");
   const { fontSize } = props;
-  const lineHeight = fontSize * LINE_HEIGHT;
+  const lineHeight = fontSize * TEXT_LINE_HEIGHT;
 
   if (props.mode === "standalone") {
     // Standalone text: left-aligned at (x, y)

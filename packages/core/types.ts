@@ -80,7 +80,10 @@ export interface TextElement extends BaseElement {
   y: number;
   text: string;
   fontSize?: number; // default 16
-  /** Explicit box size (set after resize); omitted until first resize */
+  /**
+   * Cached content box (kept in sync on resize / font-size changes).
+   * Bounds always derive from text + fontSize; these are not authoritative.
+   */
   width?: number;
   height?: number;
 }

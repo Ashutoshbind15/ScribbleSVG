@@ -1,7 +1,9 @@
 import { useCallback, useRef } from "react";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
+  DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
+  measureTextSize,
   scaleFontSizeForResize,
   type Bounds,
   type DiagramElement,
@@ -74,6 +76,7 @@ export function useElementResize(
         resize.originalElement,
         newBounds,
         resize.startBounds,
+        resize.handle,
       );
       if (patch) {
         const elementUpdates = [{ id: resize.elementId, patch }];
@@ -161,6 +164,7 @@ function boundsToElementPatch(
   original: DiagramElement,
   bounds: Bounds,
   resizeStartBounds: Bounds,
+  handle: HandlePosition,
 ): Partial<DiagramElement> | null {
   switch (original.type) {
     case "rectangle":
@@ -205,17 +209,22 @@ function boundsToElementPatch(
     }
 
     case "text": {
-      const baseFontSize = original.fontSize ?? 16;
+      // Scale font from the gesture, then hug the resulting glyphs and
+      // pin the opposite corner/edge so the box doesn't float off the text.
+      const baseFontSize = original.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
+      const fontSize = scaleFontSizeForResize(
+        baseFontSize,
+        bounds,
+        resizeStartBounds,
+      );
+      const size = measureTextSize(original.text, fontSize);
+      const { x, y } = anchorTextTopLeft(resizeStartBounds, size, handle);
       return {
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        fontSize: scaleFontSizeForResize(
-          baseFontSize,
-          bounds,
-          resizeStartBounds,
-        ),
+        x,
+        y,
+        width: size.width,
+        height: size.height,
+        fontSize,
       };
     }
 
@@ -224,4 +233,39 @@ function boundsToElementPatch(
       // Connectors aren't resized via handles
       return null;
   }
+}
+
+/**
+ * Place content-sized text so the edge/corner opposite the active handle
+ * stays fixed through the resize.
+ */
+function anchorTextTopLeft(
+  startBounds: Bounds,
+  content: { width: number; height: number },
+  handle: HandlePosition,
+): { x: number; y: number } {
+  const startRight = startBounds.x + startBounds.width;
+  const startBottom = startBounds.y + startBounds.height;
+  const startCx = startBounds.x + startBounds.width / 2;
+  const startCy = startBounds.y + startBounds.height / 2;
+
+  let x: number;
+  if (handle.includes("w") && !handle.includes("e")) {
+    x = startRight - content.width;
+  } else if (handle.includes("e") && !handle.includes("w")) {
+    x = startBounds.x;
+  } else {
+    x = startCx - content.width / 2;
+  }
+
+  let y: number;
+  if (handle.includes("n") && !handle.includes("s")) {
+    y = startBottom - content.height;
+  } else if (handle.includes("s") && !handle.includes("n")) {
+    y = startBounds.y;
+  } else {
+    y = startCy - content.height / 2;
+  }
+
+  return { x, y };
 }

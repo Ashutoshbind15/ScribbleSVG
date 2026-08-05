@@ -24,6 +24,9 @@ export { parseDiagramDocument, isDiagramDocument } from "./validation";
 // Geometry
 export type { Bounds, ConnectionPoint } from "./geometry";
 export {
+  TEXT_LINE_HEIGHT,
+  TEXT_CHAR_WIDTH,
+  measureTextSize,
   getDiamondVertices,
   getElementBounds,
   getContentBounds,

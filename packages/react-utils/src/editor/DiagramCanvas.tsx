@@ -5,6 +5,7 @@ import {
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
   isConnector,
+  measureTextSize,
   type DiagramDocument,
 } from "@scribblesvg/core";
 import { useCanvasReducer } from "./useCanvasReducer";
@@ -265,13 +266,20 @@ export function DiagramCanvas({
         fontSize={fontSizeElement.fontSize ?? defaultFontSize}
         screenX={anchor.x}
         screenY={anchor.y}
-        onChange={(fontSize) =>
+        onChange={(fontSize) => {
+          const patch =
+            fontSizeElement.type === "text"
+              ? {
+                  fontSize,
+                  ...measureTextSize(fontSizeElement.text, fontSize),
+                }
+              : { fontSize };
           dispatch({
             type: "UPDATE_ELEMENT",
             id: fontSizeElement.id,
-            patch: { fontSize },
-          })
-        }
+            patch,
+          });
+        }}
       />
     );
   }
