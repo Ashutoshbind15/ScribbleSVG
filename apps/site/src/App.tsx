@@ -2,8 +2,10 @@ import { useState } from "react";
 import { EMPTY_DOCUMENT, type DiagramDocument } from "@scribblesvg/core";
 import { DiagramCanvas } from "@scribblesvg/react-utils/editor";
 import "@scribblesvg/react-utils/editor.css";
-import { exportJson, exportSvg } from "./export";
+import { exportSvg } from "./export";
 import "./styles.css";
+
+const DOCS_URL = "https://scribblesvg-docs.ashutoshbind.com/";
 
 const App = () => {
   const [document, setDocument] = useState<DiagramDocument>(EMPTY_DOCUMENT);
@@ -20,16 +22,17 @@ const App = () => {
             width={120}
             height={56}
           />
+          <span className="site-brand__sep" aria-hidden="true" />
+          <a
+            className="site-docs-link"
+            href={DOCS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Developer docs
+          </a>
         </div>
         <div className="site-actions">
-          <button
-            type="button"
-            className="site-btn"
-            disabled={!hasContent}
-            onClick={() => exportJson(document)}
-          >
-            Export JSON
-          </button>
           <button
             type="button"
             className="site-btn site-btn--primary"

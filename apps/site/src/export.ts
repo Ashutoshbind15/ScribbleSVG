@@ -13,12 +13,6 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Download the diagram document as pretty-printed JSON. */
-export function exportJson(document: DiagramDocument, filename = "diagram.json") {
-  const json = JSON.stringify(document, null, 2);
-  downloadBlob(new Blob([json], { type: "application/json" }), filename);
-}
-
 /**
  * Render the diagram to a standalone SVG file via DiagramRenderer.
  * Uses the light preset so strokes are concrete colors (not currentColor).

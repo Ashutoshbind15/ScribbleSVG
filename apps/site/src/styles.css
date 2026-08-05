@@ -28,12 +28,14 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.625rem 1rem;
-  border-bottom: 1px solid #d4d4d4;
-  background: #fafafa;
+  padding: 0.5rem 1rem;
+  background: #fff;
 }
 
 .site-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   min-width: 0;
 }
 
@@ -41,6 +43,28 @@ body {
   display: block;
   height: 2rem;
   width: auto;
+}
+
+.site-brand__sep {
+  display: block;
+  width: 1px;
+  height: 1.25rem;
+  background: #d4d4d4;
+  flex-shrink: 0;
+}
+
+.site-docs-link {
+  color: #525252;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-docs-link:hover {
+  color: #171717;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .site-canvas {
@@ -129,4 +153,11 @@ body {
   border: none;
   border-radius: 0;
   background: #fff;
+}
+
+/* Merge site nav + editor toolbar into one chrome strip — no stacked rules */
+.site .scribblesvg-editor__header {
+  border-bottom: none;
+  background: #fff;
+  padding-top: 0.25rem;
 }
