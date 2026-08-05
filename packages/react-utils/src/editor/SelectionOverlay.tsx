@@ -1,9 +1,12 @@
 import { useMemo } from "react";
 import { getElementBounds, type DiagramElement } from "@scribblesvg/core";
+import type { EditingTarget } from "./InlineTextEditor";
 
 interface SelectionOverlayProps {
   elements: DiagramElement[];
   selectedIds: Set<string>;
+  /** When set, prefer live editor bounds for the element being edited */
+  editingTarget?: EditingTarget | null;
 }
 
 const PADDING = 4; // extra padding around the bounding box
@@ -15,6 +18,7 @@ const PADDING = 4; // extra padding around the bounding box
 export function SelectionOverlay({
   elements,
   selectedIds,
+  editingTarget = null,
 }: SelectionOverlayProps) {
   const selectedElements = useMemo(
     () => elements.filter((el) => selectedIds.has(el.id)),
@@ -26,7 +30,17 @@ export function SelectionOverlay({
   return (
     <g className="selection-overlay" pointerEvents="none">
       {selectedElements.map((el) => {
-        const bounds = getElementBounds(el);
+        const bounds =
+          editingTarget &&
+          editingTarget.elementId === el.id &&
+          editingTarget.kind === "standalone-text"
+            ? {
+                x: editingTarget.x,
+                y: editingTarget.y,
+                width: editingTarget.width,
+                height: editingTarget.height,
+              }
+            : getElementBounds(el);
         return (
           <rect
             key={el.id}

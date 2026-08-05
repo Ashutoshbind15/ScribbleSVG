@@ -75,10 +75,11 @@ export function getElementBounds(el: DiagramElement): Bounds {
       };
 
     case "text": {
-      // Always size to content so the selection/resize box tracks glyphs.
-      // Stored width/height are kept in sync by resize / font-size updates
-      // but must not outrank the live text metrics (they drift when font
-      // size changes independently of the box).
+      // Prefer the editor/resize-synced box when present — it is measured from
+      // real glyphs. Fall back to the character approximation for older docs.
+      if (el.width != null && el.height != null) {
+        return { x: el.x, y: el.y, width: el.width, height: el.height };
+      }
       const fontSize = el.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
       const size = measureTextSize(el.text, fontSize);
       return { x: el.x, y: el.y, width: size.width, height: size.height };

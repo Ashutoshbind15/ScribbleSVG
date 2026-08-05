@@ -81,8 +81,8 @@ export interface TextElement extends BaseElement {
   text: string;
   fontSize?: number; // default 16
   /**
-   * Cached content box (kept in sync on resize / font-size changes).
-   * Bounds always derive from text + fontSize; these are not authoritative.
+   * Content box synced from the editor / resize (real glyph metrics).
+   * When set, used as the selection and hit bounds.
    */
   width?: number;
   height?: number;

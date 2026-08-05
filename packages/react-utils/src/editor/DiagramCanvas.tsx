@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RedoIcon, UndoIcon } from "./toolbarIcons";
 import {
-  DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
   isConnector,
-  measureTextSize,
   type DiagramDocument,
 } from "@scribblesvg/core";
 import { useCanvasReducer } from "./useCanvasReducer";
@@ -21,6 +19,7 @@ import { InlineTextEditor } from "./InlineTextEditor";
 import { Toolbar } from "./Toolbar";
 import { FontSizePopup } from "./FontSizePopup";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
+import { measureDomTextSize } from "./measureDomText";
 import { useCanvasInteraction } from "./useCanvasInteraction";
 import { partitionIconCatalog, type DiagramIcon } from "../icons";
 
@@ -109,6 +108,8 @@ export function DiagramCanvas({
     editingTarget,
     commitTextEditing,
     cancelTextEditing,
+    changeEditingFontSize,
+    updateEditingLayout,
   } = useCanvasInteraction(state, dispatch, svgRef, size, catalog.valid);
 
   // ── Wheel zoom (native listener for non-passive preventDefault) ──
@@ -236,48 +237,51 @@ export function DiagramCanvas({
   // Handle size in canvas-space (adjust for zoom)
   const handleSizeCanvas = handleSize / state.document.viewport.zoom;
 
-  // ── Font size popup: shown for a single selected element that has
-  // (or can have) text, so its font size can be changed independently
-  // of the parent element's width/height. ──
-  const fontSizeElement =
-    !editingTarget &&
-    singleSelectedElement &&
-    !isConnector(singleSelectedElement) &&
-    (singleSelectedElement.type === "text" ||
-      ("text" in singleSelectedElement && !!singleSelectedElement.text))
-      ? singleSelectedElement
-      : null;
-
+  // ── Font size popup ──
+  // Mode-split: standalone text shows it on select; shape labels only while
+  // editing (so selection chrome stays geometry-only).
   let fontSizePopup: React.ReactNode = null;
-  if (fontSizeElement) {
-    const bounds = getElementBounds(fontSizeElement);
+  if (editingTarget) {
+    const anchor = canvasToScreen(
+      editingTarget.x + editingTarget.width / 2,
+      editingTarget.y,
+      state.document.viewport,
+      size,
+    );
+    fontSizePopup = (
+      <FontSizePopup
+        fontSize={editingTarget.fontSize}
+        screenX={anchor.x}
+        screenY={anchor.y}
+        onChange={changeEditingFontSize}
+      />
+    );
+  } else if (singleSelectedElement?.type === "text") {
+    const bounds = getElementBounds(singleSelectedElement);
     const anchor = canvasToScreen(
       bounds.x + bounds.width / 2,
       bounds.y,
       state.document.viewport,
       size,
     );
-    const defaultFontSize =
-      fontSizeElement.type === "text"
-        ? DEFAULT_TEXT_FONT_SIZE
-        : DEFAULT_SHAPE_LABEL_FONT_SIZE;
     fontSizePopup = (
       <FontSizePopup
-        fontSize={fontSizeElement.fontSize ?? defaultFontSize}
+        fontSize={singleSelectedElement.fontSize ?? DEFAULT_TEXT_FONT_SIZE}
         screenX={anchor.x}
         screenY={anchor.y}
         onChange={(fontSize) => {
-          const patch =
-            fontSizeElement.type === "text"
-              ? {
-                  fontSize,
-                  ...measureTextSize(fontSizeElement.text, fontSize),
-                }
-              : { fontSize };
+          const textSize = measureDomTextSize(
+            singleSelectedElement.text,
+            fontSize,
+          );
           dispatch({
             type: "UPDATE_ELEMENT",
-            id: fontSizeElement.id,
-            patch,
+            id: singleSelectedElement.id,
+            patch: {
+              fontSize,
+              width: textSize.width,
+              height: textSize.height,
+            },
           });
         }}
       />
@@ -351,6 +355,7 @@ export function DiagramCanvas({
           <SelectionOverlay
             elements={state.document.elements}
             selectedIds={state.selectedIds}
+            editingTarget={editingTarget}
           />
 
           {/* Marquee (box) selection preview */}
@@ -395,6 +400,7 @@ export function DiagramCanvas({
               target={editingTarget}
               onCommit={commitTextEditing}
               onCancel={cancelTextEditing}
+              onLayoutChange={updateEditingLayout}
             />
           )}
         </svg>

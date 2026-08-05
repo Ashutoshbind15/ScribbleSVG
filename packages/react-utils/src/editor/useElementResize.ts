@@ -3,7 +3,6 @@ import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
-  measureTextSize,
   scaleFontSizeForResize,
   type Bounds,
   type DiagramElement,
@@ -15,6 +14,7 @@ import {
   dispatchBoundArrowAnchorUpdates,
   getBoundArrowAnchorUpdates,
 } from "./arrowAnchors";
+import { measureDomTextSize } from "./measureDomText";
 
 /** Minimum size constraint for shapes */
 const MIN_SIZE = 20;
@@ -217,7 +217,7 @@ function boundsToElementPatch(
         bounds,
         resizeStartBounds,
       );
-      const size = measureTextSize(original.text, fontSize);
+      const size = measureDomTextSize(original.text, fontSize);
       const { x, y } = anchorTextTopLeft(resizeStartBounds, size, handle);
       return {
         x,

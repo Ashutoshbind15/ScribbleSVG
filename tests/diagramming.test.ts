@@ -409,15 +409,16 @@ describe("@scribblesvg/core", () => {
     assertClose(emptyTextBounds.width, 9.6, "empty text minimum width");
     assertClose(emptyTextBounds.height, 19.2, "empty text minimum height");
 
-    // Stored width/height must not override live text metrics — otherwise
-    // font-size changes leave the selection box stranded.
+    // Synced width/height from the editor are authoritative for the box.
     const explicitTextBounds = getElementBounds(
       createText({ x: 10, y: 20, text: "Hi", fontSize: 16, width: 120, height: 40 }),
     );
-    assert.equal(explicitTextBounds.x, 10);
-    assert.equal(explicitTextBounds.y, 20);
-    assertClose(explicitTextBounds.width, 19.2, "content width ignores stored box");
-    assertClose(explicitTextBounds.height, 19.2, "content height ignores stored box");
+    assert.deepEqual(explicitTextBounds, {
+      x: 10,
+      y: 20,
+      width: 120,
+      height: 40,
+    });
   });
 
   test("scales font size proportionally when bounds change", () => {
@@ -505,11 +506,12 @@ describe("@scribblesvg/core", () => {
       y: 50,
       text: "Label",
       fontSize: 16,
+      width: 80,
+      height: 30,
     });
-    // "Label" → 5 * 16 * 0.6 = 48 wide, 16 * 1.2 = 19.2 tall
-    const textAnchorRight = getAnchorPoint(text, { x: 300, y: 59.6 });
-    assertClose(textAnchorRight.x, 148, "text right edge x");
-    assertClose(textAnchorRight.y, 59.6, "text right edge y");
+    const textAnchorRight = getAnchorPoint(text, { x: 300, y: 65 });
+    assertClose(textAnchorRight.x, 180, "text right edge x");
+    assertClose(textAnchorRight.y, 65, "text right edge y");
 
     const diamond = createDiamond();
     const diamondRight = getAnchorPoint(diamond, { x: 600, y: 90 });

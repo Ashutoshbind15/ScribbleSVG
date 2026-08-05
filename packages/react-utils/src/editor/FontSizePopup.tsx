@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MinusIcon, PlusIcon } from "./toolbarIcons";
 
 interface FontSizePopupProps {
@@ -21,10 +21,8 @@ function clamp(value: number): number {
 }
 
 /**
- * Floating popup shown above a selected text/label element, letting the
- * user manually change its font size without affecting the parent
- * element's width/height (resizing the shape already scales the font
- * proportionally — this control adjusts font size independently).
+ * Floating segmented stepper for font size.
+ * Shown above standalone text on select, or above any text while editing.
  */
 export function FontSizePopup({
   fontSize,
@@ -35,6 +33,9 @@ export function FontSizePopup({
   const committedSize = Math.round(fontSize);
   const [inputValue, setInputValue] = useState(String(committedSize));
   const [isEditing, setIsEditing] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const skipBlurCommitRef = useRef(false);
 
   useEffect(() => {
     if (!isEditing) {
@@ -42,26 +43,54 @@ export function FontSizePopup({
     }
   }, [committedSize, isEditing]);
 
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
+
+  /** After typing a size, return focus to the inline text editor if open. */
+  const restoreInlineEditorFocus = useCallback(() => {
+    requestAnimationFrame(() => {
+      const editor = rootRef.current?.closest(".scribblesvg-editor");
+      const textarea = editor?.querySelector(
+        ".scribblesvg-editor__viewport textarea",
+      );
+      if (textarea instanceof HTMLTextAreaElement) {
+        textarea.focus();
+      }
+    });
+  }, []);
+
+  const endValueEdit = useCallback(() => {
+    skipBlurCommitRef.current = true;
+    setIsEditing(false);
+    restoreInlineEditorFocus();
+  }, [restoreInlineEditorFocus]);
+
   const handleStep = useCallback(
     (delta: number) => {
       onChange(clamp(committedSize + delta));
+      // Discard any in-progress typed value without a blur commit race.
+      if (isEditing) {
+        endValueEdit();
+      }
     },
-    [committedSize, onChange],
-  );
-
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setInputValue(e.target.value);
-    },
-    [],
+    [committedSize, onChange, isEditing, endValueEdit],
   );
 
   const revertInput = useCallback(() => {
     setInputValue(String(committedSize));
-    setIsEditing(false);
-  }, [committedSize]);
+    endValueEdit();
+  }, [committedSize, endValueEdit]);
 
   const commitInput = useCallback(() => {
+    if (skipBlurCommitRef.current) {
+      skipBlurCommitRef.current = false;
+      return;
+    }
+
     const trimmed = inputValue.trim();
     if (trimmed === "") {
       revertInput();
@@ -77,17 +106,23 @@ export function FontSizePopup({
     const nextSize = clamp(Math.round(value));
     onChange(nextSize);
     setInputValue(String(nextSize));
-    setIsEditing(false);
-  }, [inputValue, onChange, revertInput]);
+    endValueEdit();
+  }, [inputValue, onChange, endValueEdit, revertInput]);
 
-  // Prevent interactions with the popup from reaching the canvas
-  // (would otherwise clear selection / start a pan / etc.)
+  // Keep canvas / inline-editor focus behavior intact: don't let +/− steal
+  // focus from the textarea, and don't let popup events clear selection.
   const stopPropagation = useCallback((e: React.SyntheticEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  const preventFocusSteal = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
     e.stopPropagation();
   }, []);
 
   return (
     <div
+      ref={rootRef}
       className="scribblesvg-editor__font-popup"
       style={{
         left: screenX,
@@ -102,35 +137,53 @@ export function FontSizePopup({
         type="button"
         title="Decrease font size"
         aria-label="Decrease font size"
+        onPointerDown={preventFocusSteal}
         onClick={() => handleStep(-STEP)}
       >
         <MinusIcon />
       </button>
-      <input
-        type="number"
-        title="Font size"
-        aria-label="Font size"
-        value={inputValue}
-        min={MIN_FONT_SIZE}
-        max={MAX_FONT_SIZE}
-        onFocus={() => setIsEditing(true)}
-        onChange={handleInputChange}
-        onBlur={commitInput}
-        onKeyDown={(e) => {
-          e.stopPropagation();
+      <span className="scribblesvg-editor__font-popup-divider" aria-hidden="true" />
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          title="Font size"
+          aria-label="Font size"
+          className="scribblesvg-editor__font-popup-value"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onBlur={commitInput}
+          onKeyDown={(e) => {
+            e.stopPropagation();
 
-          if (e.key === "Enter") {
-            e.currentTarget.blur();
-          } else if (e.key === "Escape") {
-            revertInput();
-            e.currentTarget.blur();
-          }
-        }}
-      />
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              revertInput();
+            }
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          title="Font size"
+          aria-label={`Font size ${committedSize}. Click to edit.`}
+          className="scribblesvg-editor__font-popup-value"
+          onPointerDown={preventFocusSteal}
+          onClick={() => setIsEditing(true)}
+        >
+          {committedSize}
+        </button>
+      )}
+      <span className="scribblesvg-editor__font-popup-divider" aria-hidden="true" />
       <button
         type="button"
         title="Increase font size"
         aria-label="Increase font size"
+        onPointerDown={preventFocusSteal}
         onClick={() => handleStep(STEP)}
       >
         <PlusIcon />

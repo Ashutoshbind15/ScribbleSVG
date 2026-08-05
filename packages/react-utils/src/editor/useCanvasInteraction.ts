@@ -6,7 +6,6 @@ import {
   getElementBounds,
   isBindable,
   isConnector,
-  measureTextSize,
   type Bounds,
   type CircleElement,
   type CylinderElement,
@@ -32,6 +31,7 @@ import { useElementResize } from "./useElementResize";
 import { useArrowCreation } from "./useArrowCreation";
 import type { CanvasAction, ToolType, CanvasState } from "./useCanvasReducer";
 import type { EditingTarget } from "./InlineTextEditor";
+import { measureDomTextSize } from "./measureDomText";
 import { resolveDiagramIcon, type DiagramIcon } from "../icons";
 import {
   cloneElementsForPaste,
@@ -350,15 +350,15 @@ export function useCanvasInteraction(
   const openTextEditor = useCallback((element: DiagramElement) => {
     if (element.type === "text") {
       const fontSize = element.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
-      const size = measureTextSize(element.text, fontSize);
+      const size = measureDomTextSize(element.text, fontSize);
       setEditingTarget({
         elementId: element.id,
         kind: "standalone-text",
         text: element.text,
         x: element.x,
         y: element.y,
-        width: Math.max(size.width, 60),
-        height: Math.max(size.height, 24),
+        width: Math.max(size.width + 8, 60),
+        height: Math.max(size.height + 8, 24),
         fontSize,
       });
     } else if (
@@ -398,7 +398,7 @@ export function useCanvasInteraction(
             existing && existing.type === "text"
               ? (existing.fontSize ?? DEFAULT_TEXT_FONT_SIZE)
               : DEFAULT_TEXT_FONT_SIZE;
-          const size = measureTextSize(trimmedText, fontSize);
+          const size = measureDomTextSize(trimmedText, fontSize);
           dispatch({
             type: "UPDATE_ELEMENT",
             id: elementId,
@@ -429,6 +429,79 @@ export function useCanvasInteraction(
     endTextHistoryGroup();
     setEditingTarget(null);
   }, [endTextHistoryGroup]);
+
+  /**
+   * Grow the standalone text editor box while typing / after font changes.
+   * Element width/height are written on commit (and on font-size when not
+   * editing) so keystrokes don't flood undo history.
+   */
+  const updateEditingLayout = useCallback(
+    (layout: { width: number; height: number; text: string }) => {
+      setEditingTarget((current) => {
+        if (!current || current.kind !== "standalone-text") return current;
+        if (
+          current.width === layout.width &&
+          current.height === layout.height &&
+          current.text === layout.text
+        ) {
+          return current;
+        }
+        return {
+          ...current,
+          text: layout.text,
+          width: layout.width,
+          height: layout.height,
+        };
+      });
+    },
+    [],
+  );
+
+  /**
+   * Apply a font-size change while inline-editing. Layout is re-measured by
+   * InlineTextEditor after the new font size is applied.
+   */
+  const changeEditingFontSize = useCallback(
+    (fontSize: number) => {
+      if (!editingTarget) return;
+
+      const textarea = document.querySelector(
+        ".scribblesvg-editor__viewport textarea",
+      );
+      const liveText =
+        textarea instanceof HTMLTextAreaElement
+          ? textarea.value
+          : editingTarget.text;
+      const size =
+        editingTarget.kind === "standalone-text"
+          ? measureDomTextSize(liveText, fontSize)
+          : null;
+
+      dispatch({
+        type: "UPDATE_ELEMENT",
+        id: editingTarget.elementId,
+        patch: size
+          ? {
+              fontSize,
+              width: size.width,
+              height: size.height,
+            }
+          : { fontSize },
+      });
+      setEditingTarget({
+        ...editingTarget,
+        text: liveText,
+        fontSize,
+        ...(size
+          ? {
+              width: Math.max(size.width + 8, 60),
+              height: Math.max(size.height + 8, 24),
+            }
+          : {}),
+      });
+    },
+    [editingTarget, dispatch],
+  );
 
   // ── Pointer down on a connection point (connector tool) ──
   const handleConnectionPointPointerDown = useCallback(
@@ -543,15 +616,16 @@ export function useCanvasInteraction(
         dispatch({ type: "SET_TOOL", tool: "select" });
         dispatch({ type: "SET_SELECTION", ids: [elementId] });
 
-        // Open inline editor immediately for the new text element
+        // Open inline editor immediately; box grows with typed content.
+        const size = measureDomTextSize("", fontSize);
         setEditingTarget({
           elementId,
           kind: "standalone-text",
           text: "",
           x: canvasPoint.x,
           y: canvasPoint.y,
-          width: 150,
-          height: fontSize * 1.2 + 4,
+          width: Math.max(size.width + 8, 60),
+          height: Math.max(size.height + 8, 24),
           fontSize,
         });
         return;
@@ -1003,5 +1077,7 @@ export function useCanvasInteraction(
     editingTarget,
     commitTextEditing,
     cancelTextEditing,
+    changeEditingFontSize,
+    updateEditingLayout,
   };
 }
