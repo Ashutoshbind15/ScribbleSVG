@@ -308,6 +308,25 @@ function lineDiamondIntersection(
 }
 
 /**
+ * Snap `end` so the segment from `start` runs at a multiple of 22.5°
+ * (horizontal, vertical, diagonal, and the half-steps between),
+ * preserving the segment length.
+ * Used for Shift-constrained straight line/arrow drawing.
+ */
+export function constrainToStraightAngle(start: Point, end: Point): Point {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (length === 0) return end;
+
+  const snapped = Math.round(Math.atan2(dy, dx) / (Math.PI / 8)) * (Math.PI / 8);
+  return {
+    x: start.x + Math.cos(snapped) * length,
+    y: start.y + Math.sin(snapped) * length,
+  };
+}
+
+/**
  * Scale a font size proportionally when an element's bounds change during resize.
  * Uses geometric mean of width/height scale factors (same as standalone text).
  */

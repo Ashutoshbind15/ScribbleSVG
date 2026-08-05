@@ -33,6 +33,7 @@ function buildShortcuts(mod: string, isApple: boolean): ShortcutRow[] {
     { keys: ["Shift", "click"], label: "Multi-select" },
     { keys: ["Drag empty"], label: "Box select" },
     { keys: ["Shift", "drag"], label: "Add to box selection" },
+    { keys: ["Shift"], label: "Straight arrow/line (22.5°)" },
     { keys: [mod, "C"], label: "Copy" },
     { keys: [mod, "X"], label: "Cut" },
     { keys: [mod, "V"], label: "Paste" },

@@ -127,6 +127,20 @@ export function useCanvasInteraction(
   const [hoveredConnectionPoint, setHoveredConnectionPoint] =
     useState<ConnectionPointHit | null>(null);
 
+  // Last cursor position while a connector tool is active — lets Shift
+  // keydown/keyup re-snap the preview without waiting for pointer movement.
+  const lastConnectorPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  const updateConnectorPreviewForShift = useCallback(
+    (constrain: boolean) => {
+      if (!arrowStart || !isConnectorTool(tool)) return;
+      const point = lastConnectorPointRef.current;
+      if (!point) return;
+      updatePreview(point, HANDLE_SIZE / viewport.zoom, constrain);
+    },
+    [arrowStart, tool, viewport.zoom, updatePreview],
+  );
+
   useEffect(() => {
     if (!isConnectorTool(tool)) {
       setHoveredConnectionPoint(null);
@@ -243,6 +257,9 @@ export function useCanvasInteraction(
         return;
       }
 
+      if (e.key === "Shift" && !e.repeat) {
+        updateConnectorPreviewForShift(true);
+      }
       if (e.code === "Space" && !e.repeat) {
         e.preventDefault();
         setSpaceHeld(true);
@@ -287,6 +304,9 @@ export function useCanvasInteraction(
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") {
+        updateConnectorPreviewForShift(false);
+      }
       if (e.code === "Space") {
         setSpaceHeld(false);
       }
@@ -306,6 +326,7 @@ export function useCanvasInteraction(
     handleCut,
     handlePaste,
     cancelArrow,
+    updateConnectorPreviewForShift,
   ]);
 
   // ── Canvas-space point from pointer event ──
@@ -470,7 +491,7 @@ export function useCanvasInteraction(
       // Connector tools (arrow / line)
       if (isConnectorTool(tool)) {
         const snapThreshold = HANDLE_SIZE / viewport.zoom;
-        handleArrowClick(tool, canvasPoint, snapThreshold);
+        handleArrowClick(tool, canvasPoint, snapThreshold, e.shiftKey);
         return;
       }
 
@@ -838,11 +859,12 @@ export function useCanvasInteraction(
       // Connector tool: track hovered connection point and preview snap
       if (isConnectorTool(tool)) {
         const snapThreshold = HANDLE_SIZE / viewport.zoom;
+        lastConnectorPointRef.current = canvasPoint;
         setHoveredConnectionPoint(
           hitTestConnectionPoint(canvasPoint, elements, snapThreshold),
         );
         if (arrowStart) {
-          updatePreview(canvasPoint, snapThreshold);
+          updatePreview(canvasPoint, snapThreshold, e.shiftKey);
         }
         return;
       }

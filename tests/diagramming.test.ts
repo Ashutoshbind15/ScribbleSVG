@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 import {
   DEFAULT_VIEWPORT,
   EMPTY_DOCUMENT,
+  constrainToStraightAngle,
   generateSeed,
   getAnchorPoint,
   getElementConnectionPoints,
@@ -519,6 +520,63 @@ describe("@scribblesvg/core", () => {
     const diamondTop = getAnchorPoint(diamond, { x: 450, y: -100 });
     assertClose(diamondTop.x, 450, "diamond top vertex x");
     assertClose(diamondTop.y, 50, "diamond top vertex y");
+  });
+
+  test("constrains connector end points to straight 22.5° angles", () => {
+    const start = { x: 100, y: 100 };
+
+    const horizontal = constrainToStraightAngle(start, { x: 210, y: 108 });
+    assertClose(horizontal.y, 100, "near-horizontal snaps to horizontal");
+    assertClose(
+      horizontal.x - start.x,
+      Math.hypot(110, 8),
+      "near-horizontal preserves length",
+    );
+
+    const vertical = constrainToStraightAngle(start, { x: 96, y: 240 });
+    assertClose(vertical.x, 100, "near-vertical snaps to vertical");
+    assertClose(
+      vertical.y - start.y,
+      Math.hypot(-4, 140),
+      "near-vertical preserves length",
+    );
+
+    const diagonal = constrainToStraightAngle(start, { x: 220, y: 210 });
+    assertClose(
+      diagonal.x - start.x,
+      diagonal.y - start.y,
+      "near-45° snaps to exact diagonal",
+    );
+
+    // ~30° lands between 22.5° and 45°, closer to 22.5°
+    const halfStep = constrainToStraightAngle(start, { x: 220, y: 160 });
+    const halfStepAngle =
+      (Math.atan2(halfStep.y - start.y, halfStep.x - start.x) * 180) / Math.PI;
+    assertClose(halfStepAngle, 22.5, "~30° snaps to the 22.5° half-step");
+
+    // ~40° is closer to 45° than to 22.5°
+    const nearDiagonal = constrainToStraightAngle(start, { x: 215, y: 185 });
+    const nearDiagonalAngle =
+      (Math.atan2(nearDiagonal.y - start.y, nearDiagonal.x - start.x) * 180) /
+      Math.PI;
+    assertClose(nearDiagonalAngle, 45, "~40° still snaps to 45°");
+
+    const up = constrainToStraightAngle(start, { x: 104, y: 20 });
+    assertClose(up.x, 100, "upward near-vertical snaps x");
+    const left = constrainToStraightAngle(start, { x: 10, y: 96 });
+    assertClose(left.y, 100, "leftward near-horizontal snaps y");
+    const upLeft = constrainToStraightAngle(start, { x: 30, y: 25 });
+    assertClose(
+      upLeft.x - start.x,
+      upLeft.y - start.y,
+      "up-left snaps to exact diagonal",
+    );
+
+    assert.deepEqual(
+      constrainToStraightAngle(start, start),
+      start,
+      "zero-length segment stays put",
+    );
   });
 
   test("exposes connection points per bindable shape", () => {

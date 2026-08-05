@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import {
+  constrainToStraightAngle,
   generateSeed,
   getAnchorPoint,
   getElementCenter,
@@ -124,6 +125,7 @@ export function useArrowCreation(
       kind: ConnectorKind,
       canvasPoint: { x: number; y: number },
       snapThreshold?: number,
+      constrain?: boolean,
     ) => {
       if (snapThreshold != null) {
         const connHit = hitTestConnectionPoint(
@@ -148,9 +150,12 @@ export function useArrowCreation(
 
         handleArrowPointClick(kind, startPoint, bindableHit?.id);
       } else {
+        // Shift constrains free end points to 22.5°; bound anchors stay exact.
         const endPoint = bindableHit
           ? getAnchorPoint(bindableHit, arrowStart.point)
-          : canvasPoint;
+          : constrain
+            ? constrainToStraightAngle(arrowStart.point, canvasPoint)
+            : canvasPoint;
         const startPoint = resolveStartPoint(
           arrowStart,
           endPoint,
@@ -170,7 +175,11 @@ export function useArrowCreation(
   );
 
   const updatePreview = useCallback(
-    (canvasPoint: { x: number; y: number }, snapThreshold?: number) => {
+    (
+      canvasPoint: { x: number; y: number },
+      snapThreshold?: number,
+      constrain?: boolean,
+    ) => {
       if (!arrowStart) return;
 
       if (snapThreshold != null) {
@@ -192,7 +201,11 @@ export function useArrowCreation(
       if (bindableHit) {
         setPreviewEnd(getAnchorPoint(bindableHit, arrowStart.point));
       } else {
-        setPreviewEnd(canvasPoint);
+        setPreviewEnd(
+          constrain
+            ? constrainToStraightAngle(arrowStart.point, canvasPoint)
+            : canvasPoint,
+        );
       }
     },
     [arrowStart, elements],

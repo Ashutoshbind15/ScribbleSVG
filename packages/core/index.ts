@@ -30,6 +30,7 @@ export {
   getElementCenter,
   getElementConnectionPoints,
   getAnchorPoint,
+  constrainToStraightAngle,
   scaleFontSizeForResize,
 } from "./geometry";
 
