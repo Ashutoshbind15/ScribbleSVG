@@ -24,7 +24,7 @@ bun add @scribblesvg/core
 
 - **Types** : `DiagramDocument`, shape/connector elements, viewport
 - **Validation** : parse and type-check diagram JSON
-- **Geometry** : bounds, connection points, anchors
+- **Geometry** : bounds, text sizing, connection points, anchors, straight-angle constraints
 - **Rendering** : SVG path data for scribble-style shapes
 - **Constants & seeds** : empty document defaults and deterministic stroke seeds
 

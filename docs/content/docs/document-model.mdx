@@ -30,7 +30,7 @@ Use `EMPTY_DOCUMENT` from `@scribblesvg/core` as a starting point. Validate untr
 | `arrow` | Connector with arrowheads |
 | `line` | Straight connector without heads |
 
-All elements share `id` (UUID) and `seed` (Rough.js determinism). Shapes store geometry (`x`/`y`/`width`/`height` or `cx`/`cy`/`radius`) and optional `text` / `fontSize`.
+All elements share `id` (UUID) and `seed` (Rough.js determinism). Shapes store geometry (`x`/`y`/`width`/`height` or `cx`/`cy`/`radius`) and optional `text` / `fontSize`. Standalone `text` elements may also store `width` / `height` synced from the editor’s real glyph metrics; when omitted, core falls back to `measureTextSize`.
 
 ## Connectors
 

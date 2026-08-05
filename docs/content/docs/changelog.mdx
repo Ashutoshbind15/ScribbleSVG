@@ -7,9 +7,18 @@ Package versions in this monorepo (see each package’s `package.json` for the s
 
 | Package | Version |
 | --- | --- |
-| `@scribblesvg/core` | 0.2.2 |
-| `@scribblesvg/react-utils` | 0.2.5 |
+| `@scribblesvg/core` | 0.2.3 |
+| `@scribblesvg/react-utils` | 0.2.6 |
 | docs site | 0.2.1 |
+
+## 0.2.3 / 0.2.6
+
+Editor and geometry improvements:
+
+- **Shift + draw** snaps arrows/lines to 22.5° steps via `constrainToStraightAngle`
+- Standalone text bounds hug live glyph metrics (selection, resize, and font-size changes stay in sync)
+- Core exports `measureTextSize`, `TEXT_LINE_HEIGHT`, and `TEXT_CHAR_WIDTH` for shared text sizing
+- Font-size control and inline text editing resize with content
 
 ## 0.2.2 / 0.2.5
 
