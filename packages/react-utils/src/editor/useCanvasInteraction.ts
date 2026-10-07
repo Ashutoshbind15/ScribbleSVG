@@ -4,7 +4,6 @@ import {
   DEFAULT_TEXT_FONT_SIZE,
   generateSeed,
   getElementBounds,
-  isBindable,
   isConnector,
   type Bounds,
   type CircleElement,
@@ -21,6 +20,7 @@ import { screenToCanvas } from "./coordinate-utils";
 import {
   boundsFromPoints,
   hitTest,
+  hitTestTextTarget,
   hitTestResizeHandle,
   hitTestConnectionPoint,
   resolveMarqueeSelection,
@@ -118,8 +118,8 @@ export function useCanvasInteraction(
   const {
     arrowStart,
     previewEnd,
+    previewStart,
     handleArrowClick,
-    handleArrowPointClick,
     updatePreview,
     cancelArrow,
   } = useArrowCreation(elements, dispatch);
@@ -137,7 +137,7 @@ export function useCanvasInteraction(
       if (!arrowStart || !isConnectorTool(tool)) return;
       const point = lastConnectorPointRef.current;
       if (!point) return;
-      updatePreview(point, HANDLE_SIZE / viewport.zoom, constrain);
+      updatePreview(tool, point, HANDLE_SIZE / viewport.zoom, constrain);
     },
     [arrowStart, tool, viewport.zoom, updatePreview],
   );
@@ -510,9 +510,12 @@ export function useCanvasInteraction(
 
       e.preventDefault();
       e.stopPropagation();
-      handleArrowPointClick(tool, point, elementId);
+      handleArrowClick(tool, getCanvasPoint(e), undefined, e.shiftKey, {
+        point,
+        elementId,
+      });
     },
-    [editingTarget, tool, handleArrowPointClick],
+    [editingTarget, tool, handleArrowClick, getCanvasPoint],
   );
 
   // ── Pointer down on a visible resize handle (rendered above the canvas hit layer) ──
@@ -580,22 +583,17 @@ export function useCanvasInteraction(
         return;
       }
 
-      // Text tool: clicking directly on an existing element inserts/edits
-      // text within that element (its "parent") in place, rather than
-      // stacking an unrelated standalone text element on top of it.
       if (tool === "text") {
         e.preventDefault();
 
-        const hitElement = hitTest(canvasPoint, elements);
-        if (hitElement && isBindable(hitElement)) {
+        const hitElement = hitTestTextTarget(canvasPoint, elements, viewport.zoom);
+        if (hitElement) {
           dispatch({ type: "SET_TOOL", tool: "select" });
           dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
           openTextEditor(hitElement);
           return;
         }
 
-        // Empty canvas: create a new standalone text element
-        // todo [medium]: not working atm.
         const elementId = crypto.randomUUID();
         const seed = generateSeed();
         const fontSize = DEFAULT_TEXT_FONT_SIZE;
@@ -841,11 +839,8 @@ export function useCanvasInteraction(
         containerSize,
       );
 
-      const hitElement = hitTest(canvasPoint, elements);
+      const hitElement = hitTestTextTarget(canvasPoint, elements, viewport.zoom);
       if (!hitElement) return;
-
-      // Only open editor for text elements and shapes (not connectors)
-      if (isConnector(hitElement)) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -950,7 +945,7 @@ export function useCanvasInteraction(
           hitTestConnectionPoint(canvasPoint, elements, snapThreshold),
         );
         if (arrowStart) {
-          updatePreview(canvasPoint, snapThreshold, e.shiftKey);
+          updatePreview(tool, canvasPoint, snapThreshold, e.shiftKey);
         }
         return;
       }
@@ -1069,6 +1064,7 @@ export function useCanvasInteraction(
     getCursor,
     arrowStart,
     previewEnd,
+    previewStart,
     hoveredConnectionPoint,
     marqueeBounds,
     spaceHeld,

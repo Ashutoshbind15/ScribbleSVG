@@ -1,5 +1,6 @@
 import {
   getElementBounds,
+  getElementCenter,
   getElementConnectionPoints,
   isConnector,
   type Bounds,
@@ -12,22 +13,66 @@ import {
  */
 const CONNECTOR_HIT_THRESHOLD = 5;
 
-/**
- * Determine which element (if any) is under a given canvas-space point.
- * Returns the topmost element (last in array order) or null.
- */
+/** Prefer contained hits, preserving stacking order between unrelated elements. */
 export function hitTest(
   point: { x: number; y: number },
   elements: DiagramElement[],
 ): DiagramElement | null {
-  // Iterate in reverse for topmost-first hit
-  for (let i = elements.length - 1; i >= 0; i--) {
-    const el = elements[i];
-    if (hitTestElement(point, el)) {
-      return el;
+  const hits = elements.filter((element) => hitTestElement(point, element));
+  for (let i = hits.length - 1; i >= 0; i--) {
+    const element = hits[i];
+    if (!hits.some((other) => other !== element && strictlyContains(element, other))) {
+      return element;
     }
   }
   return null;
+}
+
+function strictlyContains(outer: DiagramElement, inner: DiagramElement): boolean {
+  if (isConnector(outer)) return false;
+  const a = getElementBounds(outer);
+  const b = getElementBounds(inner);
+  if (
+    b.x < a.x || b.y < a.y ||
+    b.x + b.width > a.x + a.width || b.y + b.height > a.y + a.height ||
+    (a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height)
+  ) return false;
+
+  if (inner.type === "circle") {
+    const center = getElementCenter(outer);
+    if (outer.type === "circle") {
+      return Math.hypot(inner.cx - center.x, inner.cy - center.y) + inner.radius <= outer.radius;
+    }
+    if (outer.type === "diamond") {
+      const hw = a.width / 2;
+      const hh = a.height / 2;
+      return Math.abs(inner.cx - center.x) / hw + Math.abs(inner.cy - center.y) / hh +
+        inner.radius * Math.hypot(1 / hw, 1 / hh) <= 1;
+    }
+    return true;
+  }
+  const points = isConnector(inner)
+    ? [{ x: inner.startX, y: inner.startY }, { x: inner.endX, y: inner.endY }]
+    : inner.type === "diamond"
+      ? [{ x: b.x + b.width / 2, y: b.y }, { x: b.x + b.width, y: b.y + b.height / 2 },
+         { x: b.x + b.width / 2, y: b.y + b.height }, { x: b.x, y: b.y + b.height / 2 }]
+      : [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y },
+         { x: b.x, y: b.y + b.height }, { x: b.x + b.width, y: b.y + b.height }];
+  return points.every((point) => hitTestElement(point, outer));
+}
+
+export function hitTestTextTarget(
+  point: { x: number; y: number },
+  elements: DiagramElement[],
+  zoom: number,
+): Exclude<DiagramElement, { type: "arrow" | "line" }> | null {
+  const target = hitTest(point, elements);
+  if (!target || isConnector(target)) return null;
+  if (target.type === "text") return target;
+  const bounds = getElementBounds(target);
+  const center = getElementCenter(target);
+  const radius = Math.min(16 / zoom, bounds.width / 2, bounds.height / 2);
+  return Math.hypot(point.x - center.x, point.y - center.y) <= radius ? target : null;
 }
 
 /**

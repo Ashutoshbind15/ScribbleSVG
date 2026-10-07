@@ -100,6 +100,7 @@ export function DiagramCanvas({
     getCursor,
     arrowStart,
     previewEnd,
+    previewStart,
     hoveredConnectionPoint,
     marqueeBounds,
     spaceHeld,
@@ -385,10 +386,10 @@ export function DiagramCanvas({
             )}
 
           {/* Connector creation preview */}
-          {arrowStart && previewEnd && (
+          {previewStart && previewEnd && (
             <ArrowPreview
-              startX={arrowStart.point.x}
-              startY={arrowStart.point.y}
+              startX={previewStart.x}
+              startY={previewStart.y}
               endX={previewEnd.x}
               endY={previewEnd.y}
             />

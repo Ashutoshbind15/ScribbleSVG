@@ -173,7 +173,10 @@ export function FontSizePopup({
           aria-label={`Font size ${committedSize}. Click to edit.`}
           className="scribblesvg-editor__font-popup-value"
           onPointerDown={preventFocusSteal}
-          onClick={() => setIsEditing(true)}
+          onClick={() => {
+            skipBlurCommitRef.current = false;
+            setIsEditing(true);
+          }}
         >
           {committedSize}
         </button>

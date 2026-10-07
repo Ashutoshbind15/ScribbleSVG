@@ -82,6 +82,10 @@
   background: var(--scribblesvg-bg);
 }
 
+.scribblesvg-editor__svg text {
+  user-select: none;
+}
+
 .scribblesvg-editor__svg {
   position: absolute;
   inset: 0;
