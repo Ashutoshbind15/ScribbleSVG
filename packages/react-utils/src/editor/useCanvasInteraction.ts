@@ -19,7 +19,7 @@ import {
 import { screenToCanvas } from "./coordinate-utils";
 import {
   boundsFromPoints,
-  hitTest,
+  hitTestSelection,
   hitTestTextTarget,
   hitTestResizeHandle,
   hitTestConnectionPoint,
@@ -754,7 +754,7 @@ export function useCanvasInteraction(
         }
 
         // Hit test elements
-        const hitElement = hitTest(canvasPoint, elements);
+        const hitElement = hitTestSelection(canvasPoint, elements, viewport.zoom, selectedIds);
 
         if (hitElement) {
           e.stopPropagation();

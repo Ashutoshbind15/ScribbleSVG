@@ -41,6 +41,9 @@ export { screenToCanvas, canvasToScreen, getViewBox } from "./coordinate-utils";
 export {
   hitTest,
   hitTestElement,
+  hitTestOutline,
+  hitTestSelection,
+  OUTLINE_HIT_TOLERANCE_PX,
   hitTestResizeHandle,
   hitTestMarquee,
   resolveMarqueeSelection,

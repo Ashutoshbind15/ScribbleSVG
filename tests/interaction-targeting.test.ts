@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DiagramElement, RectangleElement } from "@scribblesvg/core";
-import { hitTest, hitTestTextTarget } from "../packages/react-utils/src/editor/hit-test.ts";
+import { hitTest, hitTestSelection, hitTestTextTarget } from "../packages/react-utils/src/editor/hit-test.ts";
 
 import { resolveConnectorTarget } from "../packages/react-utils/src/editor/connector-targeting.ts";
 
@@ -101,4 +101,30 @@ test("arrow interior targeting prefers the contained shape", () => {
   assert.deepEqual(resolveConnectorTarget({ kind: "arrow", point: { x: 200, y: 200 }, elements: [inner, outer] }).start, {
     point: { x: 240, y: 200 }, binding: "inner", automatic: true,
   });
+});
+
+test("select targeting picks shapes by their outline, not their interior", () => {
+  assert.equal(hitTestSelection({ x: 400, y: 200 }, [outer], 1), null);
+  assert.equal(hitTestSelection({ x: 3, y: 200 }, [outer], 1)?.id, "outer");
+  assert.equal(hitTestSelection({ x: 400, y: 405 }, [outer], 1)?.id, "outer");
+  assert.equal(hitTestSelection({ x: 400, y: 410 }, [outer], 1), null);
+  assert.equal(hitTestSelection({ x: 400, y: 410 }, [outer], 0.5)?.id, "outer");
+  assert.equal(hitTestSelection({ x: 200, y: 200 }, [inner, outer], 1), null);
+  assert.equal(hitTestSelection({ x: 240, y: 200 }, [outer, inner], 1)?.id, "inner");
+  assert.equal(hitTestSelection({ x: 202, y: 162 }, [outer, inner], 1)?.id, "inner");
+  const diamond: DiagramElement = { id: "diamond", type: "diamond", seed: 4, x: 0, y: 0, width: 100, height: 100 };
+  assert.equal(hitTestSelection({ x: 50, y: 50 }, [diamond], 1), null);
+  assert.equal(hitTestSelection({ x: 25, y: 25 }, [diamond], 1)?.id, "diamond");
+  const cylinder: DiagramElement = { id: "cyl", type: "cylinder", seed: 5, x: 0, y: 0, width: 100, height: 200 };
+  assert.equal(hitTestSelection({ x: 50, y: 100 }, [cylinder], 1), null);
+  assert.equal(hitTestSelection({ x: 1, y: 100 }, [cylinder], 1)?.id, "cyl");
+  assert.equal(hitTestSelection({ x: 50, y: 1 }, [cylinder], 1)?.id, "cyl");
+  assert.equal(hitTestSelection({ x: 50, y: 24 }, [cylinder], 1)?.id, "cyl");
+});
+
+test("select targeting keeps text bodies and selected interiors draggable", () => {
+  const text: DiagramElement = { id: "text", type: "text", seed: 3, x: 100, y: 100, text: "Existing text", fontSize: 20 };
+  assert.equal(hitTestSelection({ x: 105, y: 105 }, [outer, text], 1)?.id, "text");
+  assert.equal(hitTestSelection({ x: 400, y: 200 }, [outer], 1, new Set(["outer"]))?.id, "outer");
+  assert.equal(hitTestSelection({ x: 240, y: 200 }, [outer, inner], 1, new Set(["outer"]))?.id, "inner");
 });

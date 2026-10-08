@@ -75,6 +75,79 @@ export function hitTestTextTarget(
   return Math.hypot(point.x - center.x, point.y - center.y) <= radius ? target : null;
 }
 
+/** Screen-space distance from a shape's outline that still counts as a select hit. */
+export const OUTLINE_HIT_TOLERANCE_PX = 6;
+
+/**
+ * Select-tool targeting: shapes are picked only near their outline, so
+ * clicking inside a large (possibly off-screen) shape falls through to the
+ * canvas. Text, icons, and connectors keep their normal hit areas. The body
+ * of an already-selected element still hits so it can be dragged.
+ */
+export function hitTestSelection(
+  point: { x: number; y: number },
+  elements: DiagramElement[],
+  zoom: number,
+  selectedIds: ReadonlySet<string> = new Set(),
+): DiagramElement | null {
+  const tolerance = OUTLINE_HIT_TOLERANCE_PX / zoom;
+  for (let i = elements.length - 1; i >= 0; i--) {
+    if (hitTestOutline(point, elements[i], tolerance)) return elements[i];
+  }
+  return hitTest(point, elements.filter((element) => selectedIds.has(element.id)));
+}
+
+/** Test whether a point lies within `tolerance` of an element's visible outline. */
+export function hitTestOutline(
+  point: { x: number; y: number },
+  element: DiagramElement,
+  tolerance: number,
+): boolean {
+  switch (element.type) {
+    case "icon":
+    case "text":
+      return hitTestElement(point, element);
+
+    case "arrow":
+    case "line":
+      return pointNearLineSegment(
+        point,
+        { x: element.startX, y: element.startY },
+        { x: element.endX, y: element.endY },
+        Math.max(tolerance, CONNECTOR_HIT_THRESHOLD),
+      );
+
+    case "circle":
+      return Math.abs(Math.hypot(point.x - element.cx, point.y - element.cy) - element.radius) <= tolerance;
+
+    case "rectangle":
+      return pointNearPolygon(point, rectCorners(getElementBounds(element)), tolerance);
+
+    case "diamond": {
+      const { x, y, width, height } = getElementBounds(element);
+      return pointNearPolygon(point, [
+        { x: x + width / 2, y }, { x: x + width, y: y + height / 2 },
+        { x: x + width / 2, y: y + height }, { x, y: y + height / 2 },
+      ], tolerance);
+    }
+
+    case "cylinder": {
+      // Mirrors getCylinderPaths: vertical sides plus top and bottom ellipses.
+      const { x, y, width, height } = element;
+      const capHeight = Math.min(width * 0.25, height * 0.3);
+      const cx = x + width / 2;
+      const topCy = y + capHeight / 2;
+      const bottomCy = y + height - capHeight / 2;
+      return (
+        pointNearLineSegment(point, { x, y: topCy }, { x, y: bottomCy }, tolerance) ||
+        pointNearLineSegment(point, { x: x + width, y: topCy }, { x: x + width, y: bottomCy }, tolerance) ||
+        pointNearEllipse(point, cx, topCy, width / 2, capHeight / 2, tolerance) ||
+        pointNearEllipse(point, cx, bottomCy, width / 2, capHeight / 2, tolerance)
+      );
+    }
+  }
+}
+
 /**
  * Test whether a point hits a single element.
  */
@@ -409,6 +482,39 @@ function pointInCircle(
   const dx = point.x - cx;
   const dy = point.y - cy;
   return dx * dx + dy * dy <= radius * radius;
+}
+
+function rectCorners({ x, y, width, height }: Bounds): { x: number; y: number }[] {
+  return [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }];
+}
+
+function pointNearPolygon(
+  point: { x: number; y: number },
+  vertices: { x: number; y: number }[],
+  threshold: number,
+): boolean {
+  return vertices.some((a, i) =>
+    pointNearLineSegment(point, a, vertices[(i + 1) % vertices.length], threshold));
+}
+
+/** First-order (Sampson) distance to an ellipse outline; exact for circles. */
+function pointNearEllipse(
+  point: { x: number; y: number },
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  threshold: number,
+): boolean {
+  if (rx <= 0 || ry <= 0) {
+    return pointNearLineSegment(point, { x: cx - rx, y: cy - ry }, { x: cx + rx, y: cy + ry }, threshold);
+  }
+  const dx = point.x - cx;
+  const dy = point.y - cy;
+  const f = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) - 1;
+  const grad = 2 * Math.hypot(dx / (rx * rx), dy / (ry * ry));
+  if (grad === 0) return Math.min(rx, ry) <= threshold;
+  return Math.abs(f) / grad <= threshold;
 }
 
 /**
