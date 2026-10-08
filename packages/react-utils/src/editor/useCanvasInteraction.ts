@@ -152,6 +152,9 @@ export function useCanvasInteraction(
   // Interaction mode
   const [mode, setMode] = useState<InteractionMode>("none");
 
+  // Select tool: whether the pointer is over something a click would pick up
+  const [hoveringSelectable, setHoveringSelectable] = useState(false);
+
   // Pan state
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(
     null,
@@ -937,6 +940,13 @@ export function useCanvasInteraction(
         return;
       }
 
+      if (tool === "select") {
+        setHoveringSelectable(
+          hitTestSelection(canvasPoint, elements, viewport.zoom, selectedIds) !== null,
+        );
+        return;
+      }
+
       // Connector tool: track hovered connection point and preview snap
       if (isConnectorTool(tool)) {
         const snapThreshold = HANDLE_SIZE / viewport.zoom;
@@ -963,6 +973,7 @@ export function useCanvasInteraction(
       arrowStart,
       updatePreview,
       elements,
+      selectedIds,
     ],
   );
 
@@ -1050,9 +1061,9 @@ export function useCanvasInteraction(
     if (mode === "dragging") return "move";
     if (mode === "marqueeing") return "crosshair";
     if (spaceHeld) return "grab";
-    if (tool === "select") return "default";
+    if (tool === "select") return hoveringSelectable ? "move" : "default";
     return "crosshair";
-  }, [mode, spaceHeld, tool, editingTarget]);
+  }, [mode, spaceHeld, tool, editingTarget, hoveringSelectable]);
 
   return {
     handlePointerDown,
