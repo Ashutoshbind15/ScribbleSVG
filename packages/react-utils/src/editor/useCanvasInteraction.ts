@@ -53,6 +53,17 @@ const DEFAULT_ICON_SIZE = { width: 150, height: 80 };
 /** Handle half-size in canvas-space pixels */
 const HANDLE_SIZE = 5;
 
+/** Screen-space pointer travel below which a press-release counts as a click. */
+const CLICK_SLOP_PX = 3;
+
+/** Current value of the inline editor's textarea (state lags keystrokes). */
+function readLiveEditorText(fallback: string): string {
+  const textarea = document.querySelector(
+    ".scribblesvg-editor__viewport textarea",
+  );
+  return textarea instanceof HTMLTextAreaElement ? textarea.value : fallback;
+}
+
 function isConnectorTool(tool: ToolType): tool is "arrow" | "line" {
   return tool === "arrow" || tool === "line";
 }
@@ -96,7 +107,7 @@ interface MarqueeState {
  * - Deletion (Delete/Backspace)
  * - Copy / cut / paste (Ctrl/Cmd+C/X/V)
  * - Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y)
- * - Double-click to edit text on any text/shape element
+ * - Click a selected element again to edit its text; double-click adds free text
  */
 export function useCanvasInteraction(
   state: CanvasState,
@@ -179,6 +190,19 @@ export function useCanvasInteraction(
   const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(
     null,
   );
+  /** Live editing target; cleared on commit so a late blur can't commit twice. */
+  const editingTargetRef = useRef(editingTarget);
+  editingTargetRef.current = editingTarget;
+
+  /**
+   * Set when the press lands on the already sole-selected element; if it is
+   * released without dragging, that click opens the element's text editor.
+   */
+  const pendingEditRef = useRef<{
+    elementId: string;
+    screenStart: { x: number; y: number };
+  } | null>(null);
+
   /** True while a new standalone text element's create+edit is one undo group. */
   const textHistoryOpenRef = useRef(false);
 
@@ -387,9 +411,49 @@ export function useCanvasInteraction(
     }
   }, []);
 
+  // ── Create an empty standalone text element and start editing it ──
+  const createTextAt = useCallback(
+    (point: { x: number; y: number }) => {
+      const elementId = crypto.randomUUID();
+      const fontSize = DEFAULT_TEXT_FONT_SIZE;
+
+      const element: TextElement = {
+        id: elementId,
+        type: "text",
+        seed: generateSeed(),
+        x: point.x,
+        y: point.y,
+        text: "",
+        fontSize,
+      };
+
+      dispatch({ type: "BEGIN_HISTORY" });
+      textHistoryOpenRef.current = true;
+      dispatch({ type: "ADD_ELEMENT", element });
+      dispatch({ type: "SET_TOOL", tool: "select" });
+      dispatch({ type: "SET_SELECTION", ids: [elementId] });
+
+      // Open inline editor immediately; box grows with typed content.
+      const size = measureDomTextSize("", fontSize);
+      setEditingTarget({
+        elementId,
+        kind: "standalone-text",
+        text: "",
+        x: point.x,
+        y: point.y,
+        width: Math.max(size.width + 8, 60),
+        height: Math.max(size.height + 8, 24),
+        fontSize,
+      });
+    },
+    [dispatch],
+  );
+
   // ── Commit text editing ──
   const commitTextEditing = useCallback(
     (elementId: string, text: string, kind: EditingTarget["kind"]) => {
+      if (editingTargetRef.current?.elementId !== elementId) return;
+      editingTargetRef.current = null;
       const trimmedText = text.trim();
 
       if (kind === "standalone-text") {
@@ -430,6 +494,7 @@ export function useCanvasInteraction(
 
   // ── Cancel text editing ──
   const cancelTextEditing = useCallback(() => {
+    editingTargetRef.current = null;
     endTextHistoryGroup();
     setEditingTarget(null);
   }, [endTextHistoryGroup]);
@@ -469,13 +534,7 @@ export function useCanvasInteraction(
     (fontSize: number) => {
       if (!editingTarget) return;
 
-      const textarea = document.querySelector(
-        ".scribblesvg-editor__viewport textarea",
-      );
-      const liveText =
-        textarea instanceof HTMLTextAreaElement
-          ? textarea.value
-          : editingTarget.text;
+      const liveText = readLiveEditorText(editingTarget.text);
       const size =
         editingTarget.kind === "standalone-text"
           ? measureDomTextSize(liveText, fontSize)
@@ -559,12 +618,19 @@ export function useCanvasInteraction(
   // ── Pointer down on SVG ──
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
-      // If currently editing text, ignore pointer events on canvas
-      // (the editor handles its own events)
-      if (editingTarget) return;
-
       const svg = svgRef.current;
       if (!svg) return;
+
+      // A press outside the inline editor (its own presses don't reach here)
+      // commits the edit and still acts as a normal click.
+      let targets = elements;
+      if (editingTarget) {
+        const text = readLiveEditorText(editingTarget.text);
+        commitTextEditing(editingTarget.elementId, text, editingTarget.kind);
+        if (editingTarget.kind === "standalone-text" && text.trim() === "") {
+          targets = elements.filter((el) => el.id !== editingTarget.elementId);
+        }
+      }
       const canvasPoint = getCanvasPoint(e);
 
       // Middle-click or space+left-click → pan
@@ -590,7 +656,7 @@ export function useCanvasInteraction(
       if (tool === "text") {
         e.preventDefault();
 
-        const hitElement = hitTestTextTarget(canvasPoint, elements, viewport.zoom);
+        const hitElement = hitTestTextTarget(canvasPoint, targets, viewport.zoom);
         if (hitElement) {
           dispatch({ type: "SET_TOOL", tool: "select" });
           dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
@@ -598,38 +664,7 @@ export function useCanvasInteraction(
           return;
         }
 
-        const elementId = crypto.randomUUID();
-        const seed = generateSeed();
-        const fontSize = DEFAULT_TEXT_FONT_SIZE;
-
-        const element: TextElement = {
-          id: elementId,
-          type: "text",
-          seed,
-          x: canvasPoint.x,
-          y: canvasPoint.y,
-          text: "",
-          fontSize,
-        };
-
-        dispatch({ type: "BEGIN_HISTORY" });
-        textHistoryOpenRef.current = true;
-        dispatch({ type: "ADD_ELEMENT", element });
-        dispatch({ type: "SET_TOOL", tool: "select" });
-        dispatch({ type: "SET_SELECTION", ids: [elementId] });
-
-        // Open inline editor immediately; box grows with typed content.
-        const size = measureDomTextSize("", fontSize);
-        setEditingTarget({
-          elementId,
-          kind: "standalone-text",
-          text: "",
-          x: canvasPoint.x,
-          y: canvasPoint.y,
-          width: Math.max(size.width + 8, 60),
-          height: Math.max(size.height + 8, 24),
-          fontSize,
-        });
+        createTextAt(canvasPoint);
         return;
       }
 
@@ -734,10 +769,12 @@ export function useCanvasInteraction(
 
       // Select tool: click-select, drag-move, or marquee on empty canvas
       if (tool === "select") {
+        pendingEditRef.current = null;
+
         // Check if pointer is on a resize handle of a selected element
         if (selectedIds.size === 1) {
           const selectedId = Array.from(selectedIds)[0];
-          const selectedEl = elements.find((el) => el.id === selectedId);
+          const selectedEl = targets.find((el) => el.id === selectedId);
           if (selectedEl && !isConnector(selectedEl)) {
             const bounds = getElementBounds(selectedEl);
             // Adjust handle size based on zoom
@@ -758,7 +795,7 @@ export function useCanvasInteraction(
         }
 
         // Hit test elements
-        const hitElement = hitTestSelection(canvasPoint, elements, viewport.zoom, selectedIds);
+        const hitElement = hitTestSelection(canvasPoint, targets, viewport.zoom, selectedIds);
 
         if (hitElement) {
           e.stopPropagation();
@@ -776,6 +813,17 @@ export function useCanvasInteraction(
               ids: Array.from(next),
             });
           } else {
+            // Clicking the sole selection again edits its text (on release)
+            if (
+              !editingTarget &&
+              selectedIds.size === 1 &&
+              selectedIds.has(hitElement.id)
+            ) {
+              pendingEditRef.current = {
+                elementId: hitElement.id,
+                screenStart: { x: e.clientX, y: e.clientY },
+              };
+            }
             // If not already selected, select it
             if (!selectedIds.has(hitElement.id)) {
               dispatch({
@@ -792,7 +840,7 @@ export function useCanvasInteraction(
           setMode("dragging");
           startDrag(dragIds, canvasPoint);
           svg.setPointerCapture(e.pointerId);
-        } else if (!e.shiftKey && hitTestGroupSelection(canvasPoint, elements, selectedIds)) {
+        } else if (!e.shiftKey && hitTestGroupSelection(canvasPoint, targets, selectedIds)) {
           // Empty space inside a multi-selection's group box drags the group
           e.stopPropagation();
           setMode("dragging");
@@ -828,16 +876,21 @@ export function useCanvasInteraction(
       startResize,
       editingTarget,
       openTextEditor,
+      createTextAt,
+      commitTextEditing,
       activeIconId,
       icons,
     ],
   );
 
-  // ── Double-click on SVG → open text editor ──
+  // ── Double-click on SVG → add free text at the pointer ──
+  // On an element, the first click selects it and the second already opened
+  // its editor, so editingTarget short-circuits this.
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       if (editingTarget) return;
       if (e.button !== 0) return;
+      if (tool !== "select") return;
 
       const svg = svgRef.current;
       if (!svg) return;
@@ -849,27 +902,11 @@ export function useCanvasInteraction(
         containerSize,
       );
 
-      const hitElement = hitTestTextTarget(canvasPoint, elements, viewport.zoom);
-      if (!hitElement) return;
-
       e.preventDefault();
       e.stopPropagation();
-
-      // Select the element
-      dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
-
-      // Open the text editor
-      openTextEditor(hitElement);
+      createTextAt(canvasPoint);
     },
-    [
-      svgRef,
-      viewport,
-      containerSize,
-      elements,
-      dispatch,
-      openTextEditor,
-      editingTarget,
-    ],
+    [svgRef, viewport, containerSize, tool, createTextAt, editingTarget],
   );
 
   // ── Pointer move on SVG ──
@@ -1003,6 +1040,19 @@ export function useCanvasInteraction(
         endDrag();
         setMode("none");
         svg.releasePointerCapture(e.pointerId);
+
+        const pendingEdit = pendingEditRef.current;
+        pendingEditRef.current = null;
+        if (
+          pendingEdit &&
+          Math.hypot(
+            e.clientX - pendingEdit.screenStart.x,
+            e.clientY - pendingEdit.screenStart.y,
+          ) < CLICK_SLOP_PX
+        ) {
+          const element = elements.find((el) => el.id === pendingEdit.elementId);
+          if (element) openTextEditor(element);
+        }
         return;
       }
 
@@ -1058,6 +1108,7 @@ export function useCanvasInteraction(
       elements,
       selectedIds,
       getCanvasPoint,
+      openTextEditor,
     ],
   );
 

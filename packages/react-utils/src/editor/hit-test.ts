@@ -67,23 +67,41 @@ export function hitTestTextTarget(
   elements: DiagramElement[],
   zoom: number,
 ): Exclude<DiagramElement, { type: "arrow" | "line" }> | null {
-  const target = hitTest(point, elements);
-  if (!target || isConnector(target)) return null;
-  if (target.type === "text") return target;
-  const bounds = getElementBounds(target);
-  const center = getElementCenter(target);
+  const top = hitTest(point, elements);
+  if (top?.type === "text") return top;
+  // Deepest shape whose center hotspot holds the point — a container's center
+  // still hits when it happens to sit inside a nested child's body.
+  const centered = elements.filter(
+    (element) =>
+      !isConnector(element) &&
+      element.type !== "text" &&
+      hitTestElement(point, element) &&
+      inCenterHotspot(point, element, zoom),
+  );
+  const target = hitTest(point, centered);
+  return target && !isConnector(target) ? target : null;
+}
+
+function inCenterHotspot(
+  point: { x: number; y: number },
+  element: DiagramElement,
+  zoom: number,
+): boolean {
+  const bounds = getElementBounds(element);
+  const center = getElementCenter(element);
   const radius = Math.min(16 / zoom, bounds.width / 2, bounds.height / 2);
-  return Math.hypot(point.x - center.x, point.y - center.y) <= radius ? target : null;
+  return Math.hypot(point.x - center.x, point.y - center.y) <= radius;
 }
 
 /** Screen-space distance from a shape's outline that still counts as a select hit. */
 export const OUTLINE_HIT_TOLERANCE_PX = 6;
 
 /**
- * Select-tool targeting: shapes are picked only near their outline, so
- * clicking inside a large (possibly off-screen) shape falls through to the
- * canvas. Text, icons, and connectors keep their normal hit areas. The body
- * of an already-selected element still hits so it can be dragged.
+ * Select-tool targeting: shapes are picked near their outline or at their
+ * center hotspot (deepest wins), so clicking elsewhere inside a large
+ * (possibly off-screen) shape falls through to the canvas. Text, icons, and
+ * connectors keep their normal hit areas. The body of an already-selected
+ * element still hits so it can be dragged.
  */
 export function hitTestSelection(
   point: { x: number; y: number },
@@ -95,6 +113,8 @@ export function hitTestSelection(
   for (let i = elements.length - 1; i >= 0; i--) {
     if (hitTestOutline(point, elements[i], tolerance)) return elements[i];
   }
+  const centered = hitTestTextTarget(point, elements, zoom);
+  if (centered) return centered;
   return hitTest(point, elements.filter((element) => selectedIds.has(element.id)));
 }
 

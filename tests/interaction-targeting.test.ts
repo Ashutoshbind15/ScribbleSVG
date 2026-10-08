@@ -39,6 +39,10 @@ test("text targeting uses the geometry winner and a zoom-aware center radius", (
   assert.equal(hitTestTextTarget({ x: 200, y: 200 }, [inner, outer], 1)?.id, "inner");
   const text: DiagramElement = { id: "text", type: "text", seed: 3, x: 100, y: 100, text: "Existing text", fontSize: 20 };
   assert.equal(hitTestTextTarget({ x: 101, y: 101 }, [text, outer], 1)?.id, "text");
+  // A container's center still hits when it lies inside a nested child's body
+  const cover: DiagramElement = { ...inner, id: "cover", cx: 400, cy: 230, radius: 60 };
+  assert.equal(hitTestTextTarget({ x: 400, y: 200 }, [outer, cover], 1)?.id, "outer");
+  assert.equal(hitTestTextTarget({ x: 400, y: 230 }, [outer, cover], 1)?.id, "cover");
   const tiny = { ...outer, id: "tiny", width: 10, height: 10 };
   assert.equal(hitTestTextTarget({ x: 5, y: 5 }, [tiny], 0.1)?.id, "tiny");
   assert.equal(hitTestTextTarget({ x: 9, y: 9 }, [tiny], 0.1), null);
@@ -111,19 +115,23 @@ test("arrow interior targeting prefers the contained shape", () => {
 });
 
 test("select targeting picks shapes by their outline, not their interior", () => {
-  assert.equal(hitTestSelection({ x: 400, y: 200 }, [outer], 1), null);
+  assert.equal(hitTestSelection({ x: 400, y: 200 }, [outer], 1)?.id, "outer");
+  assert.equal(hitTestSelection({ x: 300, y: 200 }, [outer], 1), null);
   assert.equal(hitTestSelection({ x: 3, y: 200 }, [outer], 1)?.id, "outer");
   assert.equal(hitTestSelection({ x: 400, y: 405 }, [outer], 1)?.id, "outer");
   assert.equal(hitTestSelection({ x: 400, y: 410 }, [outer], 1), null);
   assert.equal(hitTestSelection({ x: 400, y: 410 }, [outer], 0.5)?.id, "outer");
-  assert.equal(hitTestSelection({ x: 200, y: 200 }, [inner, outer], 1), null);
+  assert.equal(hitTestSelection({ x: 200, y: 200 }, [inner, outer], 1)?.id, "inner");
+  assert.equal(hitTestSelection({ x: 220, y: 200 }, [inner, outer], 1), null);
   assert.equal(hitTestSelection({ x: 240, y: 200 }, [outer, inner], 1)?.id, "inner");
   assert.equal(hitTestSelection({ x: 202, y: 162 }, [outer, inner], 1)?.id, "inner");
   const diamond: DiagramElement = { id: "diamond", type: "diamond", seed: 4, x: 0, y: 0, width: 100, height: 100 };
-  assert.equal(hitTestSelection({ x: 50, y: 50 }, [diamond], 1), null);
+  assert.equal(hitTestSelection({ x: 50, y: 50 }, [diamond], 1)?.id, "diamond");
+  assert.equal(hitTestSelection({ x: 50, y: 30 }, [diamond], 1), null);
   assert.equal(hitTestSelection({ x: 25, y: 25 }, [diamond], 1)?.id, "diamond");
   const cylinder: DiagramElement = { id: "cyl", type: "cylinder", seed: 5, x: 0, y: 0, width: 100, height: 200 };
-  assert.equal(hitTestSelection({ x: 50, y: 100 }, [cylinder], 1), null);
+  assert.equal(hitTestSelection({ x: 50, y: 100 }, [cylinder], 1)?.id, "cyl");
+  assert.equal(hitTestSelection({ x: 50, y: 70 }, [cylinder], 1), null);
   assert.equal(hitTestSelection({ x: 1, y: 100 }, [cylinder], 1)?.id, "cyl");
   assert.equal(hitTestSelection({ x: 50, y: 1 }, [cylinder], 1)?.id, "cyl");
   assert.equal(hitTestSelection({ x: 50, y: 24 }, [cylinder], 1)?.id, "cyl");
