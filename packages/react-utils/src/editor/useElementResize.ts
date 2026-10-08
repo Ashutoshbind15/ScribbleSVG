@@ -7,7 +7,7 @@ import {
   type Bounds,
   type DiagramElement,
 } from "@scribblesvg/core";
-import type { HandlePosition } from "./hit-test";
+import { getElementsBounds, type HandlePosition } from "./hit-test";
 import type { CanvasAction } from "./useCanvasReducer";
 import {
   applyElementPatches,
@@ -15,11 +15,18 @@ import {
   getBoundArrowAnchorUpdates,
 } from "./arrowAnchors";
 import { measureDomTextSize } from "./measureDomText";
+import {
+  computeGroupScale,
+  getGroupScalePatches,
+  getMinGroupScale,
+  getScaleAnchor,
+} from "./group-scale";
 
 /** Minimum size constraint for shapes */
 const MIN_SIZE = 20;
 
 interface ResizeState {
+  kind: "single";
   elementId: string;
   handle: HandlePosition;
   startCanvasPoint: { x: number; y: number };
@@ -28,14 +35,28 @@ interface ResizeState {
   originalElement: DiagramElement;
 }
 
+/** Uniform scale of a multi-selection from one of its corners. */
+interface GroupScaleState {
+  kind: "group";
+  ids: Set<string>;
+  handle: HandlePosition;
+  startCanvasPoint: { x: number; y: number };
+  startBounds: Bounds;
+  anchor: { x: number; y: number };
+  minScale: number;
+  /** Original snapshots of the selected elements */
+  originalElements: DiagramElement[];
+}
+
 /**
- * Hook for resizing a single selected element via drag handles.
+ * Hook for resizing a single selected element via drag handles, or scaling
+ * a multi-selection from its group box corners.
  */
 export function useElementResize(
   elements: DiagramElement[],
   dispatch: React.Dispatch<CanvasAction>,
 ) {
-  const resizeRef = useRef<ResizeState | null>(null);
+  const resizeRef = useRef<ResizeState | GroupScaleState | null>(null);
 
   const startResize = useCallback(
     (
@@ -47,6 +68,7 @@ export function useElementResize(
       if (!el) return;
 
       resizeRef.current = {
+        kind: "single",
         elementId,
         handle,
         startCanvasPoint: canvasPoint,
@@ -58,10 +80,66 @@ export function useElementResize(
     [elements, dispatch],
   );
 
+  const startGroupScale = useCallback(
+    (
+      ids: ReadonlySet<string>,
+      handle: HandlePosition,
+      canvasPoint: { x: number; y: number },
+    ) => {
+      const originalElements = elements.filter((el) => ids.has(el.id));
+      const startBounds = getElementsBounds(originalElements);
+      if (!startBounds) return false;
+
+      resizeRef.current = {
+        kind: "group",
+        ids: new Set(ids),
+        handle,
+        startCanvasPoint: canvasPoint,
+        startBounds,
+        anchor: getScaleAnchor(startBounds, handle),
+        minScale: getMinGroupScale(originalElements),
+        originalElements,
+      };
+      dispatch({ type: "BEGIN_HISTORY" });
+      return true;
+    },
+    [elements, dispatch],
+  );
+
   const continueResize = useCallback(
     (canvasPoint: { x: number; y: number }) => {
       const resize = resizeRef.current;
       if (!resize) return;
+
+      if (resize.kind === "group") {
+        const scale = computeGroupScale(
+          resize.startBounds,
+          resize.handle,
+          canvasPoint.x - resize.startCanvasPoint.x,
+          canvasPoint.y - resize.startCanvasPoint.y,
+          resize.minScale,
+        );
+        const elementUpdates = getGroupScalePatches(
+          resize.originalElements,
+          resize.anchor,
+          scale,
+        );
+        // Re-anchor bound connector ends onto the scaled shapes, folding
+        // those fixes into any selected connector's own scale patch.
+        const projectedElements = applyElementPatches(elements, elementUpdates);
+        const updates = new Map(elementUpdates.map((u) => [u.id, u.patch]));
+        for (const { id, patch } of getBoundArrowAnchorUpdates(
+          resize.ids,
+          projectedElements,
+        )) {
+          updates.set(id, { ...updates.get(id), ...patch });
+        }
+        dispatch({
+          type: "UPDATE_ELEMENTS",
+          updates: Array.from(updates, ([id, patch]) => ({ id, patch })),
+        });
+        return;
+      }
 
       const dx = canvasPoint.x - resize.startCanvasPoint.x;
       const dy = canvasPoint.y - resize.startCanvasPoint.y;
@@ -98,8 +176,10 @@ export function useElementResize(
     if (!resizeRef.current) return false;
 
     // Recalculate bound arrow anchors after resize
-    const resizedId = resizeRef.current.elementId;
-    dispatchBoundArrowAnchorUpdates(new Set([resizedId]), elements, dispatch);
+    const resize = resizeRef.current;
+    const resizedIds =
+      resize.kind === "group" ? resize.ids : new Set([resize.elementId]);
+    dispatchBoundArrowAnchorUpdates(resizedIds, elements, dispatch);
 
     resizeRef.current = null;
     dispatch({ type: "END_HISTORY" });
@@ -108,7 +188,13 @@ export function useElementResize(
 
   const isResizing = useCallback(() => resizeRef.current !== null, []);
 
-  return { startResize, continueResize, endResize, isResizing };
+  return {
+    startResize,
+    startGroupScale,
+    continueResize,
+    endResize,
+    isResizing,
+  };
 }
 
 /**

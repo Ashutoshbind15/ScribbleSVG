@@ -121,6 +121,23 @@ export function hitTestSelection(
 /** Canvas-space padding between a multi-selection's members and its group box. */
 export const GROUP_SELECTION_PADDING = 8;
 
+/** Unpadded box enclosing the given elements, or null if there are none. */
+export function getElementsBounds(elements: DiagramElement[]): Bounds | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const element of elements) {
+    const { x, y, width, height } = getElementBounds(element);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
+  }
+  if (minX === Infinity) return null;
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
 /**
  * Padded box enclosing every selected element, or null unless two or more
  * are selected. The whole box acts as one drag target for the group.
@@ -130,24 +147,15 @@ export function getGroupSelectionBounds(
   selectedIds: ReadonlySet<string>,
 ): Bounds | null {
   if (selectedIds.size < 2) return null;
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const element of elements) {
-    if (!selectedIds.has(element.id)) continue;
-    const { x, y, width, height } = getElementBounds(element);
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x + width);
-    maxY = Math.max(maxY, y + height);
-  }
-  if (minX === Infinity) return null;
+  const bounds = getElementsBounds(
+    elements.filter((element) => selectedIds.has(element.id)),
+  );
+  if (!bounds) return null;
   return {
-    x: minX - GROUP_SELECTION_PADDING,
-    y: minY - GROUP_SELECTION_PADDING,
-    width: maxX - minX + GROUP_SELECTION_PADDING * 2,
-    height: maxY - minY + GROUP_SELECTION_PADDING * 2,
+    x: bounds.x - GROUP_SELECTION_PADDING,
+    y: bounds.y - GROUP_SELECTION_PADDING,
+    width: bounds.width + GROUP_SELECTION_PADDING * 2,
+    height: bounds.height + GROUP_SELECTION_PADDING * 2,
   };
 }
 
@@ -328,18 +336,36 @@ export function getResizeHandles(bounds: Bounds): HandleInfo[] {
   ];
 }
 
+/** Cursor shown over (and while dragging) each resize handle. */
+export const HANDLE_CURSORS: Record<HandlePosition, string> = {
+  nw: "nwse-resize",
+  n: "ns-resize",
+  ne: "nesw-resize",
+  e: "ew-resize",
+  se: "nwse-resize",
+  s: "ns-resize",
+  sw: "nesw-resize",
+  w: "ew-resize",
+};
+
+/** Corner handles only; a group scales uniformly, so it has no edge handles. */
+export const CORNER_HANDLES: readonly HandlePosition[] = ["nw", "ne", "se", "sw"];
+
 /**
  * Test if a point is over a resize handle.
  * Returns the handle position or null.
  * `handleSize` is the half-size of the handle in canvas coords.
+ * `positions` limits which handles are live (default: all 8).
  */
 export function hitTestResizeHandle(
   point: { x: number; y: number },
   bounds: Bounds,
   handleSize: number,
+  positions?: readonly HandlePosition[],
 ): HandlePosition | null {
   const handles = getResizeHandles(bounds);
   for (const handle of handles) {
+    if (positions && !positions.includes(handle.position)) continue;
     if (
       Math.abs(point.x - handle.x) <= handleSize &&
       Math.abs(point.y - handle.y) <= handleSize

@@ -19,6 +19,9 @@ import {
 import { screenToCanvas } from "./coordinate-utils";
 import {
   boundsFromPoints,
+  CORNER_HANDLES,
+  getGroupSelectionBounds,
+  HANDLE_CURSORS,
   hitTestGroupSelection,
   hitTestSelection,
   hitTestTextTarget,
@@ -125,8 +128,13 @@ export function useCanvasInteraction(
     elements,
     dispatch,
   );
-  const { startResize, continueResize, endResize, isResizing } =
-    useElementResize(elements, dispatch);
+  const {
+    startResize,
+    startGroupScale,
+    continueResize,
+    endResize,
+    isResizing,
+  } = useElementResize(elements, dispatch);
   const {
     arrowStart,
     previewEnd,
@@ -163,6 +171,8 @@ export function useCanvasInteraction(
 
   // Interaction mode
   const [mode, setMode] = useState<InteractionMode>("none");
+  // Handle held during "resizing", for the cursor
+  const [resizeHandle, setResizeHandle] = useState<HandlePosition>("se");
 
   // Select tool: whether the pointer is over something a click would pick up
   const [hoveringSelectable, setHoveringSelectable] = useState(false);
@@ -584,23 +594,34 @@ export function useCanvasInteraction(
   // ── Pointer down on a visible resize handle (rendered above the canvas hit layer) ──
   const handleResizeHandlePointerDown = useCallback(
     (e: React.PointerEvent, handle: HandlePosition) => {
-      if (editingTarget) return;
-      if (tool !== "select" || selectedIds.size !== 1) {
+      if (editingTarget || tool !== "select") return;
+
+      const svg = svgRef.current;
+      if (!svg) return;
+
+      // Multi-selection: corner handles scale the whole group
+      if (selectedIds.size > 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (startGroupScale(selectedIds, handle, getCanvasPoint(e))) {
+          setMode("resizing");
+          setResizeHandle(handle);
+          svg.setPointerCapture(e.pointerId);
+        }
         return;
       }
+      if (selectedIds.size !== 1) return;
 
       const selectedId = Array.from(selectedIds)[0];
       const selectedEl = elements.find((el) => el.id === selectedId);
       if (!selectedEl || isConnector(selectedEl)) return;
-
-      const svg = svgRef.current;
-      if (!svg) return;
 
       e.preventDefault();
       e.stopPropagation();
 
       const canvasPoint = getCanvasPoint(e);
       setMode("resizing");
+      setResizeHandle(handle);
       startResize(selectedId, handle, canvasPoint);
       svg.setPointerCapture(e.pointerId);
     },
@@ -612,6 +633,7 @@ export function useCanvasInteraction(
       svgRef,
       getCanvasPoint,
       startResize,
+      startGroupScale,
     ],
   );
 
@@ -787,10 +809,31 @@ export function useCanvasInteraction(
             if (handle) {
               e.preventDefault();
               setMode("resizing");
+              setResizeHandle(handle);
               startResize(selectedId, handle, canvasPoint);
               svg.setPointerCapture(e.pointerId);
               return;
             }
+          }
+        }
+
+        // Corner handles of a multi-selection's group box scale the group
+        if (selectedIds.size > 1) {
+          const groupBounds = getGroupSelectionBounds(targets, selectedIds);
+          const handle =
+            groupBounds &&
+            hitTestResizeHandle(
+              canvasPoint,
+              groupBounds,
+              HANDLE_SIZE / viewport.zoom,
+              CORNER_HANDLES,
+            );
+          if (handle && startGroupScale(selectedIds, handle, canvasPoint)) {
+            e.preventDefault();
+            setMode("resizing");
+            setResizeHandle(handle);
+            svg.setPointerCapture(e.pointerId);
+            return;
           }
         }
 
@@ -874,6 +917,7 @@ export function useCanvasInteraction(
       handleArrowClick,
       startDrag,
       startResize,
+      startGroupScale,
       editingTarget,
       openTextEditor,
       createTextAt,
@@ -1116,13 +1160,13 @@ export function useCanvasInteraction(
   const getCursor = useCallback(() => {
     if (editingTarget) return "text";
     if (mode === "panning") return "grabbing";
-    if (mode === "resizing") return "nwse-resize";
+    if (mode === "resizing") return HANDLE_CURSORS[resizeHandle];
     if (mode === "dragging") return "move";
     if (mode === "marqueeing") return "crosshair";
     if (spaceHeld) return "grab";
     if (tool === "select") return hoveringSelectable ? "move" : "default";
     return "crosshair";
-  }, [mode, spaceHeld, tool, editingTarget, hoveringSelectable]);
+  }, [mode, resizeHandle, spaceHeld, tool, editingTarget, hoveringSelectable]);
 
   return {
     handlePointerDown,

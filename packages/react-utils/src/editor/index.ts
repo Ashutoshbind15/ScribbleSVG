@@ -54,7 +54,16 @@ export {
   boundsIntersect,
   MARQUEE_CLICK_THRESHOLD_PX,
   getResizeHandles,
+  getElementsBounds,
+  CORNER_HANDLES,
+  HANDLE_CURSORS,
 } from "./hit-test";
+export {
+  computeGroupScale,
+  getGroupScalePatches,
+  getMinGroupScale,
+  getScaleAnchor,
+} from "./group-scale";
 export type {
   HandlePosition,
   HandleInfo,

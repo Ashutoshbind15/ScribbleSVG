@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DiagramElement, RectangleElement } from "@scribblesvg/core";
 import {
+  CORNER_HANDLES,
+  getElementsBounds,
   getGroupSelectionBounds,
+  hitTestResizeHandle,
   hitTest,
   hitTestGroupSelection,
   hitTestMarquee,
@@ -10,6 +13,12 @@ import {
   hitTestTextTarget,
 } from "../packages/react-utils/src/editor/hit-test.ts";
 
+import {
+  computeGroupScale,
+  getGroupScalePatches,
+  getMinGroupScale,
+  getScaleAnchor,
+} from "../packages/react-utils/src/editor/group-scale.ts";
 import { resolveConnectorTarget } from "../packages/react-utils/src/editor/connector-targeting.ts";
 
 const outer: RectangleElement = { id: "outer", type: "rectangle", seed: 1, x: 0, y: 0, width: 800, height: 400 };
@@ -175,4 +184,43 @@ test("a multi-selection's group box spans its members and is one drag target", (
   // …while points outside it, or with only one element selected, are not.
   assert.equal(hitTestGroupSelection({ x: 1200, y: 100 }, [outer, far], both), false);
   assert.equal(hitTestGroupSelection({ x: 900, y: 500 }, [outer, far], new Set(["far"])), false);
+});
+
+test("group scale grows uniformly from the corner opposite the drag", () => {
+  const a: RectangleElement = { id: "a", type: "rectangle", seed: 1, x: 0, y: 0, width: 100, height: 50, text: "A", fontSize: 14 };
+  const b: DiagramElement = { id: "b", type: "circle", seed: 2, cx: 150, cy: 75, radius: 25 };
+  const c: DiagramElement = { id: "c", type: "arrow", seed: 3, startX: 100, startY: 25, endX: 125, endY: 75 };
+  const group = [a, b, c];
+  const bounds = getElementsBounds(group)!;
+  assert.deepEqual(bounds, { x: 0, y: 0, width: 175, height: 100 });
+
+  // Dragging se outward by 175px horizontally doubles the group
+  const anchor = getScaleAnchor(bounds, "se");
+  assert.deepEqual(anchor, { x: 0, y: 0 });
+  const scale = computeGroupScale(bounds, "se", 175, 10, getMinGroupScale(group));
+  assert.equal(scale, 2);
+
+  const patches = new Map(getGroupScalePatches(group, anchor, scale).map((u) => [u.id, u.patch]));
+  assert.deepEqual(patches.get("a"), { x: 0, y: 0, width: 200, height: 100, fontSize: 28 });
+  assert.deepEqual(patches.get("b"), { cx: 300, cy: 150, radius: 50 });
+  assert.deepEqual(patches.get("c"), { startX: 200, startY: 50, endX: 250, endY: 150 });
+
+  // nw handle pins the bottom-right corner
+  assert.deepEqual(getScaleAnchor(bounds, "nw"), { x: 175, y: 100 });
+  assert.equal(computeGroupScale(bounds, "nw", -175, 0, 0.1), 2);
+});
+
+test("group scale clamps so shapes keep a usable size", () => {
+  const a: RectangleElement = { id: "a", type: "rectangle", seed: 1, x: 0, y: 0, width: 40, height: 40 };
+  const b: RectangleElement = { id: "b", type: "rectangle", seed: 2, x: 100, y: 0, width: 200, height: 200 };
+  const min = getMinGroupScale([a, b]);
+  assert.equal(min, 0.5);
+  assert.equal(computeGroupScale(getElementsBounds([a, b])!, "se", -290, -190, min), 0.5);
+});
+
+test("group corner handles only hit at the corners", () => {
+  const bounds = { x: 0, y: 0, width: 100, height: 100 };
+  assert.equal(hitTestResizeHandle({ x: 100, y: 100 }, bounds, 5, CORNER_HANDLES), "se");
+  assert.equal(hitTestResizeHandle({ x: 50, y: 0 }, bounds, 5, CORNER_HANDLES), null);
+  assert.equal(hitTestResizeHandle({ x: 50, y: 0 }, bounds, 5), "n");
 });

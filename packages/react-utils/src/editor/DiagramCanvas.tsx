@@ -13,6 +13,7 @@ import { ElementRenderer } from "./ElementRenderer";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { MarqueeOverlay } from "./MarqueeOverlay";
 import { ResizeHandles } from "./ResizeHandles";
+import { CORNER_HANDLES, getGroupSelectionBounds } from "./hit-test";
 import { ConnectionPoints } from "./ConnectionPoints";
 import { ArrowPreview } from "./ArrowPreview";
 import { InlineTextEditor } from "./InlineTextEditor";
@@ -235,6 +236,12 @@ export function DiagramCanvas({
       ? state.document.elements.find((el) => state.selectedIds.has(el.id))
       : null;
 
+  // A multi-selection scales from the corners of its group box
+  const groupSelectionBounds = useMemo(
+    () => getGroupSelectionBounds(state.document.elements, state.selectedIds),
+    [state.document.elements, state.selectedIds],
+  );
+
   // Handle size in canvas-space (adjust for zoom)
   const handleSizeCanvas = handleSize / state.document.viewport.zoom;
 
@@ -372,6 +379,16 @@ export function DiagramCanvas({
                 onHandlePointerDown={handleResizeHandlePointerDown}
               />
             )}
+
+          {/* Corner scale handles for a multi-selection */}
+          {!editingTarget && groupSelectionBounds && (
+            <ResizeHandles
+              bounds={groupSelectionBounds}
+              positions={CORNER_HANDLES}
+              handleSize={handleSizeCanvas}
+              onHandlePointerDown={handleResizeHandlePointerDown}
+            />
+          )}
 
           {/* Connection points while a connector tool is active */}
           {!editingTarget &&

@@ -2,42 +2,53 @@ import { useMemo } from "react";
 import {
   getElementBounds,
   isConnector,
+  type Bounds,
   type DiagramElement,
 } from "@scribblesvg/core";
-import { getResizeHandles } from "./hit-test";
+import { getResizeHandles, HANDLE_CURSORS } from "./hit-test";
 import type { HandlePosition } from "./hit-test";
 
 interface ResizeHandlesProps {
-  element: DiagramElement;
+  /** Element whose bounding box gets handles; ignored when `bounds` is set */
+  element?: DiagramElement;
+  /** Explicit box for the handles (e.g. a multi-selection's group box) */
+  bounds?: Bounds;
+  /** Which handles to show (default: all 8) */
+  positions?: readonly HandlePosition[];
   /** Half-size of each handle in canvas-space */
   handleSize: number;
   onHandlePointerDown?: (e: React.PointerEvent, handle: HandlePosition) => void;
 }
 
-const HANDLE_CURSORS: Record<HandlePosition, string> = {
-  nw: "nwse-resize",
-  n: "ns-resize",
-  ne: "nesw-resize",
-  e: "ew-resize",
-  se: "nwse-resize",
-  s: "ns-resize",
-  sw: "nesw-resize",
-  w: "ew-resize",
-};
-
 /**
- * Renders 8 resize handles around a selected element's bounding box.
+ * Renders resize handles around a selected element's bounding box, or
+ * around an explicit `bounds` box.
  */
 export function ResizeHandles({
   element,
+  bounds: explicitBounds,
+  positions,
   handleSize,
   onHandlePointerDown,
 }: ResizeHandlesProps) {
-  const bounds = useMemo(() => getElementBounds(element), [element]);
-  const handles = useMemo(() => getResizeHandles(bounds), [bounds]);
+  const bounds = useMemo(
+    () => explicitBounds ?? (element ? getElementBounds(element) : null),
+    [explicitBounds, element],
+  );
+  const handles = useMemo(
+    () =>
+      bounds
+        ? getResizeHandles(bounds).filter(
+            (h) => !positions || positions.includes(h.position),
+          )
+        : [],
+    [bounds, positions],
+  );
 
   // Connectors aren't resized via box handles
-  if (isConnector(element)) return null;
+  if (!bounds || (!explicitBounds && element && isConnector(element))) {
+    return null;
+  }
 
   return (
     <g className="resize-handles">
