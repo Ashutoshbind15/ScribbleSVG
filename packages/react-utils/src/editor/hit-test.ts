@@ -4,6 +4,7 @@ import {
   getElementConnectionPoints,
   isConnector,
   type Bounds,
+  type CylinderElement,
   type DiagramElement,
 } from "@scribblesvg/core";
 
@@ -97,6 +98,49 @@ export function hitTestSelection(
   return hitTest(point, elements.filter((element) => selectedIds.has(element.id)));
 }
 
+/** Canvas-space padding between a multi-selection's members and its group box. */
+export const GROUP_SELECTION_PADDING = 8;
+
+/**
+ * Padded box enclosing every selected element, or null unless two or more
+ * are selected. The whole box acts as one drag target for the group.
+ */
+export function getGroupSelectionBounds(
+  elements: DiagramElement[],
+  selectedIds: ReadonlySet<string>,
+): Bounds | null {
+  if (selectedIds.size < 2) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const element of elements) {
+    if (!selectedIds.has(element.id)) continue;
+    const { x, y, width, height } = getElementBounds(element);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
+  }
+  if (minX === Infinity) return null;
+  return {
+    x: minX - GROUP_SELECTION_PADDING,
+    y: minY - GROUP_SELECTION_PADDING,
+    width: maxX - minX + GROUP_SELECTION_PADDING * 2,
+    height: maxY - minY + GROUP_SELECTION_PADDING * 2,
+  };
+}
+
+/** True if the point is inside the group box of a multi-selection. */
+export function hitTestGroupSelection(
+  point: { x: number; y: number },
+  elements: DiagramElement[],
+  selectedIds: ReadonlySet<string>,
+): boolean {
+  const bounds = getGroupSelectionBounds(elements, selectedIds);
+  return bounds !== null && pointInRect(point, bounds);
+}
+
 /** Test whether a point lies within `tolerance` of an element's visible outline. */
 export function hitTestOutline(
   point: { x: number; y: number },
@@ -123,29 +167,47 @@ export function hitTestOutline(
     case "rectangle":
       return pointNearPolygon(point, rectCorners(getElementBounds(element)), tolerance);
 
-    case "diamond": {
-      const { x, y, width, height } = getElementBounds(element);
-      return pointNearPolygon(point, [
-        { x: x + width / 2, y }, { x: x + width, y: y + height / 2 },
-        { x: x + width / 2, y: y + height }, { x, y: y + height / 2 },
-      ], tolerance);
-    }
+    case "diamond":
+      return pointNearPolygon(point, diamondVertices(getElementBounds(element)), tolerance);
 
     case "cylinder": {
-      // Mirrors getCylinderPaths: vertical sides plus top and bottom ellipses.
-      const { x, y, width, height } = element;
-      const capHeight = Math.min(width * 0.25, height * 0.3);
-      const cx = x + width / 2;
-      const topCy = y + capHeight / 2;
-      const bottomCy = y + height - capHeight / 2;
+      const { sides, caps } = cylinderOutline(element);
       return (
-        pointNearLineSegment(point, { x, y: topCy }, { x, y: bottomCy }, tolerance) ||
-        pointNearLineSegment(point, { x: x + width, y: topCy }, { x: x + width, y: bottomCy }, tolerance) ||
-        pointNearEllipse(point, cx, topCy, width / 2, capHeight / 2, tolerance) ||
-        pointNearEllipse(point, cx, bottomCy, width / 2, capHeight / 2, tolerance)
+        sides.some(([a, b]) => pointNearLineSegment(point, a, b, tolerance)) ||
+        caps.some((cap) => pointNearEllipse(point, cap.cx, cap.cy, cap.rx, cap.ry, tolerance))
       );
     }
   }
+}
+
+function diamondVertices({ x, y, width, height }: Bounds): { x: number; y: number }[] {
+  return [
+    { x: x + width / 2, y }, { x: x + width, y: y + height / 2 },
+    { x: x + width / 2, y: y + height }, { x, y: y + height / 2 },
+  ];
+}
+
+interface Ellipse { cx: number; cy: number; rx: number; ry: number }
+
+/** Mirrors getCylinderPaths: vertical sides plus top and bottom ellipses. */
+function cylinderOutline({ x, y, width, height }: CylinderElement): {
+  sides: [{ x: number; y: number }, { x: number; y: number }][];
+  caps: Ellipse[];
+} {
+  const capHeight = Math.min(width * 0.25, height * 0.3);
+  const cx = x + width / 2;
+  const topCy = y + capHeight / 2;
+  const bottomCy = y + height - capHeight / 2;
+  return {
+    sides: [
+      [{ x, y: topCy }, { x, y: bottomCy }],
+      [{ x: x + width, y: topCy }, { x: x + width, y: bottomCy }],
+    ],
+    caps: [
+      { cx, cy: topCy, rx: width / 2, ry: capHeight / 2 },
+      { cx, cy: bottomCy, rx: width / 2, ry: capHeight / 2 },
+    ],
+  };
 }
 
 /**
@@ -297,8 +359,10 @@ export function boundsIntersect(a: Bounds, b: Bounds): boolean {
 
 /**
  * Elements whose geometry intersects the marquee rectangle.
- * Shapes use AABB intersection; connectors use segment∩rect so thin
- * diagonals aren't selected via empty corner of their bounding box.
+ * Shapes count only when the marquee touches or encloses their outline —
+ * matching select-tool clicks — so a box drawn inside a container picks
+ * its children without the container. Connectors use segment∩rect so thin
+ * diagonals aren't selected via the empty corner of their bounding box.
  */
 export function hitTestMarquee(
   marquee: Bounds,
@@ -370,17 +434,69 @@ function elementIntersectsMarquee(
   element: DiagramElement,
   marquee: Bounds,
 ): boolean {
-  if (element.type === "arrow" || element.type === "line") {
-    return lineSegmentIntersectsRect(
-      { x: element.startX, y: element.startY },
-      { x: element.endX, y: element.endY },
-      marquee,
-    );
-  }
+  switch (element.type) {
+    case "arrow":
+    case "line":
+      return lineSegmentIntersectsRect(
+        { x: element.startX, y: element.startY },
+        { x: element.endX, y: element.endY },
+        marquee,
+      );
 
-  // Circles / diamonds: AABB intersection is the usual diagram-editor
-  // approximation and matches “select what the box touches.”
-  return boundsIntersect(getElementBounds(element), marquee);
+    case "icon":
+    case "text":
+      return boundsIntersect(getElementBounds(element), marquee);
+
+    case "rectangle":
+      return polygonOutlineIntersectsRect(rectCorners(getElementBounds(element)), marquee);
+
+    case "diamond":
+      return polygonOutlineIntersectsRect(diamondVertices(getElementBounds(element)), marquee);
+
+    case "circle":
+      return ellipseOutlineIntersectsRect(
+        { cx: element.cx, cy: element.cy, rx: element.radius, ry: element.radius },
+        marquee,
+      );
+
+    case "cylinder": {
+      const { sides, caps } = cylinderOutline(element);
+      return (
+        sides.some(([a, b]) => lineSegmentIntersectsRect(a, b, marquee)) ||
+        caps.some((cap) => ellipseOutlineIntersectsRect(cap, marquee))
+      );
+    }
+  }
+}
+
+/** True if any edge of the closed polygon touches or lies inside `rect`. */
+function polygonOutlineIntersectsRect(
+  vertices: { x: number; y: number }[],
+  rect: Bounds,
+): boolean {
+  return vertices.some((a, i) =>
+    lineSegmentIntersectsRect(a, vertices[(i + 1) % vertices.length], rect));
+}
+
+/**
+ * True if the ellipse outline touches or lies inside `rect`. Scaling by the
+ * radii keeps the rect axis-aligned and turns the ellipse into a unit circle;
+ * the (connected) rect meets the circle iff its nearest point is inside and
+ * its farthest corner is outside.
+ */
+function ellipseOutlineIntersectsRect({ cx, cy, rx, ry }: Ellipse, rect: Bounds): boolean {
+  if (rx <= 0 || ry <= 0) {
+    return lineSegmentIntersectsRect({ x: cx - rx, y: cy - ry }, { x: cx + rx, y: cy + ry }, rect);
+  }
+  const left = (rect.x - cx) / rx;
+  const right = (rect.x + rect.width - cx) / rx;
+  const top = (rect.y - cy) / ry;
+  const bottom = (rect.y + rect.height - cy) / ry;
+  const nearX = Math.max(left, Math.min(0, right));
+  const nearY = Math.max(top, Math.min(0, bottom));
+  const farX = Math.max(Math.abs(left), Math.abs(right));
+  const farY = Math.max(Math.abs(top), Math.abs(bottom));
+  return Math.hypot(nearX, nearY) <= 1 && Math.hypot(farX, farY) >= 1;
 }
 
 /**

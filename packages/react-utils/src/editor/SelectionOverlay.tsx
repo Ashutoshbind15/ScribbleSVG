@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { getElementBounds, type DiagramElement } from "@scribblesvg/core";
 import type { EditingTarget } from "./InlineTextEditor";
+import { getGroupSelectionBounds } from "./hit-test";
 
 interface SelectionOverlayProps {
   elements: DiagramElement[];
@@ -12,7 +13,8 @@ interface SelectionOverlayProps {
 const PADDING = 4; // extra padding around the bounding box
 
 /**
- * Renders dashed bounding box overlays for all selected elements.
+ * Renders dashed bounding box overlays for all selected elements, plus a
+ * solid group box around a multi-selection (its draggable area).
  * Rendered after all elements so the overlay is always on top.
  */
 export function SelectionOverlay({
@@ -25,10 +27,28 @@ export function SelectionOverlay({
     [elements, selectedIds],
   );
 
+  const groupBounds = useMemo(
+    () => getGroupSelectionBounds(elements, selectedIds),
+    [elements, selectedIds],
+  );
+
   if (selectedElements.length === 0) return null;
 
   return (
     <g className="selection-overlay" pointerEvents="none">
+      {groupBounds && (
+        <rect
+          x={groupBounds.x}
+          y={groupBounds.y}
+          width={groupBounds.width}
+          height={groupBounds.height}
+          fill="var(--color-primary, #3b82f6)"
+          fillOpacity={0.04}
+          stroke="var(--color-primary, #3b82f6)"
+          strokeWidth={1}
+          rx={2}
+        />
+      )}
       {selectedElements.map((el) => {
         const bounds =
           editingTarget &&

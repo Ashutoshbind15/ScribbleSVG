@@ -19,6 +19,7 @@ import {
 import { screenToCanvas } from "./coordinate-utils";
 import {
   boundsFromPoints,
+  hitTestGroupSelection,
   hitTestSelection,
   hitTestTextTarget,
   hitTestResizeHandle,
@@ -791,6 +792,12 @@ export function useCanvasInteraction(
           setMode("dragging");
           startDrag(dragIds, canvasPoint);
           svg.setPointerCapture(e.pointerId);
+        } else if (!e.shiftKey && hitTestGroupSelection(canvasPoint, elements, selectedIds)) {
+          // Empty space inside a multi-selection's group box drags the group
+          e.stopPropagation();
+          setMode("dragging");
+          startDrag(Array.from(selectedIds), canvasPoint);
+          svg.setPointerCapture(e.pointerId);
         } else {
           // Empty canvas → box selection (click without drag clears)
           e.preventDefault();
@@ -942,7 +949,8 @@ export function useCanvasInteraction(
 
       if (tool === "select") {
         setHoveringSelectable(
-          hitTestSelection(canvasPoint, elements, viewport.zoom, selectedIds) !== null,
+          hitTestSelection(canvasPoint, elements, viewport.zoom, selectedIds) !== null ||
+            hitTestGroupSelection(canvasPoint, elements, selectedIds),
         );
         return;
       }

@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DiagramElement, RectangleElement } from "@scribblesvg/core";
-import { hitTest, hitTestSelection, hitTestTextTarget } from "../packages/react-utils/src/editor/hit-test.ts";
+import {
+  getGroupSelectionBounds,
+  hitTest,
+  hitTestGroupSelection,
+  hitTestMarquee,
+  hitTestSelection,
+  hitTestTextTarget,
+} from "../packages/react-utils/src/editor/hit-test.ts";
 
 import { resolveConnectorTarget } from "../packages/react-utils/src/editor/connector-targeting.ts";
 
@@ -127,4 +134,37 @@ test("select targeting keeps text bodies and selected interiors draggable", () =
   assert.equal(hitTestSelection({ x: 105, y: 105 }, [outer, text], 1)?.id, "text");
   assert.equal(hitTestSelection({ x: 400, y: 200 }, [outer], 1, new Set(["outer"]))?.id, "outer");
   assert.equal(hitTestSelection({ x: 240, y: 200 }, [outer, inner], 1, new Set(["outer"]))?.id, "inner");
+});
+
+test("marquee inside a container selects the children, not the container", () => {
+  const ids = (marquee: { x: number; y: number; width: number; height: number }, els: DiagramElement[]) =>
+    hitTestMarquee(marquee, els).map((el) => el.id);
+  assert.deepEqual(ids({ x: 150, y: 150, width: 100, height: 100 }, [outer, inner]), ["inner"]);
+  assert.deepEqual(ids({ x: 190, y: 190, width: 20, height: 20 }, [outer, inner]), []);
+  assert.deepEqual(ids({ x: -10, y: 150, width: 30, height: 30 }, [outer, inner]), ["outer"]);
+  assert.deepEqual(ids({ x: -10, y: -10, width: 900, height: 500 }, [outer, inner]), ["outer", "inner"]);
+  // Circle: box in the empty corner of its bounding box misses.
+  assert.deepEqual(ids({ x: 160, y: 160, width: 5, height: 5 }, [inner]), []);
+  const diamond: DiagramElement = { id: "diamond", type: "diamond", seed: 4, x: 0, y: 0, width: 100, height: 100 };
+  assert.deepEqual(ids({ x: 40, y: 40, width: 20, height: 20 }, [diamond]), []);
+  assert.deepEqual(ids({ x: 0, y: 0, width: 10, height: 10 }, [diamond]), []);
+  assert.deepEqual(ids({ x: 20, y: 20, width: 10, height: 10 }, [diamond]), ["diamond"]);
+  const cylinder: DiagramElement = { id: "cyl", type: "cylinder", seed: 5, x: 0, y: 0, width: 100, height: 200 };
+  assert.deepEqual(ids({ x: 30, y: 80, width: 40, height: 40 }, [cylinder]), []);
+  assert.deepEqual(ids({ x: 45, y: 20, width: 10, height: 10 }, [cylinder]), ["cyl"]);
+  const text: DiagramElement = { id: "text", type: "text", seed: 3, x: 100, y: 100, text: "Existing text", fontSize: 20 };
+  assert.deepEqual(ids({ x: 105, y: 105, width: 5, height: 5 }, [text]), ["text"]);
+});
+
+test("a multi-selection's group box spans its members and is one drag target", () => {
+  const far: DiagramElement = { ...outer, id: "far", x: 1000, y: 600, width: 100, height: 50 };
+  const both = new Set(["outer", "far"]);
+  assert.deepEqual(getGroupSelectionBounds([outer, far], both), { x: -8, y: -8, width: 1116, height: 666 });
+  assert.equal(getGroupSelectionBounds([outer, far], new Set(["outer"])), null);
+  // Empty space between the two members is inside the group box…
+  assert.equal(hitTestSelection({ x: 900, y: 500 }, [outer, far], 1, both), null);
+  assert.equal(hitTestGroupSelection({ x: 900, y: 500 }, [outer, far], both), true);
+  // …while points outside it, or with only one element selected, are not.
+  assert.equal(hitTestGroupSelection({ x: 1200, y: 100 }, [outer, far], both), false);
+  assert.equal(hitTestGroupSelection({ x: 900, y: 500 }, [outer, far], new Set(["far"])), false);
 });
