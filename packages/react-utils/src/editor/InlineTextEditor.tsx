@@ -39,15 +39,21 @@ interface InlineTextEditorProps {
     height: number;
     text: string;
   }) => void;
+  /** Live text on every keystroke (size chrome tracks it). */
+  onTextChange?: (text: string) => void;
+  /** Ctrl/Cmd+Shift+> (1) or < (-1) pressed while typing. */
+  onFontSizeStep?: (direction: 1 | -1) => void;
 }
 
 /** Minimum editor dimensions */
 const MIN_WIDTH = 60;
+/** Shape labels only; standalone text hugs its line height */
 const MIN_HEIGHT = 24;
-/** Border + padding included in the foreignObject box */
+/** Slack past the glyphs so the caret never clips at the box edge */
 const STANDALONE_CHROME = 8;
 /** Extra pad so shape-label FO can paint past the shape without clipping */
 const SHAPE_LABEL_PAD = 16;
+const FONT_FAMILY = "'Segoe UI', system-ui, sans-serif";
 
 /**
  * Inline text editor overlay rendered inside the SVG via `<foreignObject>`.
@@ -56,21 +62,24 @@ const SHAPE_LABEL_PAD = 16;
  * - Enter inserts a newline (multi-line text)
  * - Standalone text grows its box with content (no scrollbars)
  *
- * Shape labels are rendered "in place": a transparent, borderless textarea
- * centered within the shape's bounds so it looks like the text is being
- * typed directly into the shape itself, rather than an opaque box sitting
- * on top of it.
+ * Both kinds are rendered "in place": a transparent, borderless textarea
+ * laid over where the SVG text sits, so typing looks like editing the text
+ * itself. The selection overlay supplies the frame.
  */
 export function InlineTextEditor({
   target,
   onCommit,
   onCancel,
   onLayoutChange,
+  onTextChange,
+  onFontSizeStep,
 }: InlineTextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isShapeLabel = target.kind === "shape-label";
   const onLayoutChangeRef = useRef(onLayoutChange);
   onLayoutChangeRef.current = onLayoutChange;
+  const onTextChangeRef = useRef(onTextChange);
+  onTextChangeRef.current = onTextChange;
   const targetSizeRef = useRef({ width: target.width, height: target.height });
   targetSizeRef.current = { width: target.width, height: target.height };
   // Live text for measuring FO size (defaultValue doesn't re-render on type).
@@ -84,6 +93,7 @@ export function InlineTextEditor({
     textarea.style.height = "auto";
     textarea.style.height = `${textarea.scrollHeight}px`;
     setShapeLabelText(textarea.value);
+    onTextChangeRef.current?.(textarea.value);
   }, [isShapeLabel]);
 
   /**
@@ -110,7 +120,8 @@ export function InlineTextEditor({
     textarea.style.height = prevHeight;
 
     const width = Math.max(contentWidth + STANDALONE_CHROME, MIN_WIDTH);
-    const height = Math.max(contentHeight + STANDALONE_CHROME, MIN_HEIGHT);
+    // Width only: vertical slack would leave a gap under the last line.
+    const height = contentHeight;
 
     const prev = targetSizeRef.current;
     if (
@@ -141,7 +152,7 @@ export function InlineTextEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-per-element
   }, [target.elementId]);
 
-  // Re-fit when font size changes (stepper) — content metrics change.
+  // Re-fit when font size changes (grip / shortcut) — content metrics change.
   useEffect(() => {
     requestAnimationFrame(() => {
       if (isShapeLabel) {
@@ -169,9 +180,20 @@ export function InlineTextEditor({
       if (e.key === "Escape") {
         e.preventDefault();
         handleCommit();
+        return;
+      }
+
+      // Ctrl/Cmd+Shift+< / > — by code so the shifted glyph doesn't matter
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.shiftKey &&
+        (e.code === "Period" || e.code === "Comma")
+      ) {
+        e.preventDefault();
+        onFontSizeStep?.(e.code === "Period" ? 1 : -1);
       }
     },
-    [handleCommit],
+    [handleCommit, onFontSizeStep],
   );
 
   const handleInput = useCallback(() => {
@@ -179,28 +201,21 @@ export function InlineTextEditor({
       autoGrowShapeLabel();
       return;
     }
+    onTextChangeRef.current?.(textareaRef.current?.value ?? "");
     fitStandaloneToContent();
   }, [isShapeLabel, autoGrowShapeLabel, fitStandaloneToContent]);
 
-  // Defer commit so focus can move into the font-size stepper without
-  // ending the edit session.
-  const handleBlur = useCallback(() => {
-    requestAnimationFrame(() => {
-      if (
-        document.activeElement?.closest(".scribblesvg-editor__font-popup")
-      ) {
-        return;
-      }
-      handleCommit();
-    });
-  }, [handleCommit]);
+  // The text size grip never takes focus, so any blur ends the edit.
+  const handleBlur = handleCommit;
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
   }, []);
 
   const editorWidth = Math.max(target.width, MIN_WIDTH);
-  const editorHeight = Math.max(target.height, MIN_HEIGHT);
+  const editorHeight = isShapeLabel
+    ? Math.max(target.height, MIN_HEIGHT)
+    : target.height;
 
   if (isShapeLabel) {
     // foreignObject clips HTML even with overflow:visible in most engines.
@@ -245,10 +260,12 @@ export function InlineTextEditor({
             onBlur={handleBlur}
             onPointerDown={handlePointerDown}
             rows={1}
+            placeholder="Label"
+            className="scribblesvg-editor__text-input"
             style={{
               width: "100%",
               fontSize: `${target.fontSize}px`,
-              fontFamily: "'Segoe UI', system-ui, sans-serif",
+              fontFamily: FONT_FAMILY,
               lineHeight: "1.2",
               padding: "0",
               margin: "0",
@@ -282,19 +299,20 @@ export function InlineTextEditor({
         onInput={handleInput}
         onBlur={handleBlur}
         onPointerDown={handlePointerDown}
+        placeholder="Type…"
+        className="scribblesvg-editor__text-input"
         style={{
           width: `${editorWidth}px`,
           height: `${editorHeight}px`,
           minWidth: `${MIN_WIDTH}px`,
-          minHeight: `${MIN_HEIGHT}px`,
           fontSize: `${target.fontSize}px`,
-          fontFamily: "'Segoe UI', system-ui, sans-serif",
+          fontFamily: FONT_FAMILY,
           lineHeight: "1.2",
-          padding: "2px",
+          // No chrome: glyphs sit exactly where the SVG text renders.
+          padding: "0",
           margin: "0",
-          border: "2px solid var(--color-primary, #3b82f6)",
-          borderRadius: "2px",
-          background: "rgba(255, 255, 255, 0.95)",
+          border: "none",
+          background: "transparent",
           color: "inherit",
           outline: "none",
           resize: "none",

@@ -46,6 +46,7 @@ function buildShortcuts(mod: string, isApple: boolean): ShortcutRow[] {
     },
     { keys: ["Del"], altKeys: ["Backspace"], label: "Delete selection" },
     { keys: ["2× click"], label: "Edit text" },
+    { keys: [mod, "Shift", ">"], altKeys: ["<"], label: "Text size up / down" },
     { keys: ["?"], label: "Toggle this panel" },
   ];
 }

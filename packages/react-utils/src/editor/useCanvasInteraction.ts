@@ -36,6 +36,7 @@ import { useArrowCreation } from "./useArrowCreation";
 import type { CanvasAction, ToolType, CanvasState } from "./useCanvasReducer";
 import type { EditingTarget } from "./InlineTextEditor";
 import { measureDomTextSize } from "./measureDomText";
+import { stepFontSize } from "./text-size";
 import { resolveDiagramIcon, type DiagramIcon } from "../icons";
 import {
   cloneElementsForPaste,
@@ -280,6 +281,39 @@ export function useCanvasInteraction(
     }
   }, [pasteElements]);
 
+  // ── Step the font size of every selected text / labeled shape ──
+  const stepSelectionFontSize = useCallback(
+    (direction: 1 | -1) => {
+      const updates: { id: string; patch: Partial<DiagramElement> }[] = [];
+      for (const el of elements) {
+        if (!selectedIds.has(el.id)) continue;
+        if (el.type === "text") {
+          const fontSize = stepFontSize(
+            el.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
+            direction,
+          );
+          const size = measureDomTextSize(el.text, fontSize);
+          updates.push({
+            id: el.id,
+            patch: { fontSize, width: size.width, height: size.height },
+          });
+        } else if (!isConnector(el) && el.text) {
+          updates.push({
+            id: el.id,
+            patch: {
+              fontSize: stepFontSize(
+                el.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
+                direction,
+              ),
+            },
+          });
+        }
+      }
+      dispatch({ type: "UPDATE_ELEMENTS", updates });
+    },
+    [elements, selectedIds, dispatch],
+  );
+
   // ── Keyboard events ──
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -321,6 +355,13 @@ export function useCanvasInteraction(
 
       const mod = e.metaKey || e.ctrlKey;
       if (!mod || e.altKey) return;
+
+      // Ctrl/Cmd+Shift+< / > — by code so the shifted glyph doesn't matter
+      if (e.shiftKey && (e.code === "Period" || e.code === "Comma")) {
+        e.preventDefault();
+        stepSelectionFontSize(e.code === "Period" ? 1 : -1);
+        return;
+      }
 
       const key = e.key.toLowerCase();
       if (key === "z") {
@@ -366,6 +407,7 @@ export function useCanvasInteraction(
     handlePaste,
     cancelArrow,
     updateConnectorPreviewForShift,
+    stepSelectionFontSize,
   ]);
 
   // ── Canvas-space point from pointer event ──
@@ -536,6 +578,15 @@ export function useCanvasInteraction(
     [],
   );
 
+  /** Track live text so the size grip hugs the glyphs and knows about typing. */
+  const updateEditingText = useCallback((text: string) => {
+    setEditingTarget((current) =>
+      current && current.text !== text
+        ? { ...current, text }
+        : current,
+    );
+  }, []);
+
   /**
    * Apply a font-size change while inline-editing. Layout is re-measured by
    * InlineTextEditor after the new font size is applied.
@@ -574,6 +625,15 @@ export function useCanvasInteraction(
       });
     },
     [editingTarget, dispatch],
+  );
+
+  /** Ctrl/Cmd+Shift+< / > while inline-editing. */
+  const stepEditingFontSize = useCallback(
+    (direction: 1 | -1) => {
+      if (!editingTarget) return;
+      changeEditingFontSize(stepFontSize(editingTarget.fontSize, direction));
+    },
+    [editingTarget, changeEditingFontSize],
   );
 
   // ── Pointer down on a connection point (connector tool) ──
@@ -797,7 +857,12 @@ export function useCanvasInteraction(
         if (selectedIds.size === 1) {
           const selectedId = Array.from(selectedIds)[0];
           const selectedEl = targets.find((el) => el.id === selectedId);
-          if (selectedEl && !isConnector(selectedEl)) {
+          // Standalone text has no box handles; its size grip handles itself
+          if (
+            selectedEl &&
+            !isConnector(selectedEl) &&
+            selectedEl.type !== "text"
+          ) {
             const bounds = getElementBounds(selectedEl);
             // Adjust handle size based on zoom
             const handleSizeCanvas = HANDLE_SIZE / viewport.zoom;
@@ -1188,6 +1253,8 @@ export function useCanvasInteraction(
     commitTextEditing,
     cancelTextEditing,
     changeEditingFontSize,
+    stepEditingFontSize,
     updateEditingLayout,
+    updateEditingText,
   };
 }

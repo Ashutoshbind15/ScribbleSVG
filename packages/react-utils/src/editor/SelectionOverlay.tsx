@@ -50,6 +50,13 @@ export function SelectionOverlay({
         />
       )}
       {selectedElements.map((el) => {
+        // Typing into a shape: the shape itself is context enough
+        if (
+          editingTarget?.elementId === el.id &&
+          editingTarget.kind === "shape-label"
+        ) {
+          return null;
+        }
         const bounds =
           editingTarget &&
           editingTarget.elementId === el.id &&

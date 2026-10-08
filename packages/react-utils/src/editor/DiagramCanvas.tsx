@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RedoIcon, UndoIcon } from "./toolbarIcons";
 import {
+  DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
   isConnector,
+  type Bounds,
   type DiagramDocument,
 } from "@scribblesvg/core";
 import { useCanvasReducer } from "./useCanvasReducer";
 import { getViewBox } from "./coordinate-utils";
-import { screenToCanvas, canvasToScreen } from "./coordinate-utils";
+import { screenToCanvas } from "./coordinate-utils";
 import { ElementRenderer } from "./ElementRenderer";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { MarqueeOverlay } from "./MarqueeOverlay";
@@ -18,7 +20,7 @@ import { ConnectionPoints } from "./ConnectionPoints";
 import { ArrowPreview } from "./ArrowPreview";
 import { InlineTextEditor } from "./InlineTextEditor";
 import { Toolbar } from "./Toolbar";
-import { FontSizePopup } from "./FontSizePopup";
+import { TextSizeGrip } from "./TextSizeGrip";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { measureDomTextSize } from "./measureDomText";
 import { useCanvasInteraction } from "./useCanvasInteraction";
@@ -111,7 +113,9 @@ export function DiagramCanvas({
     commitTextEditing,
     cancelTextEditing,
     changeEditingFontSize,
+    stepEditingFontSize,
     updateEditingLayout,
+    updateEditingText,
   } = useCanvasInteraction(state, dispatch, svgRef, size, catalog.valid);
 
   // ── Wheel zoom (native listener for non-passive preventDefault) ──
@@ -245,53 +249,88 @@ export function DiagramCanvas({
   // Handle size in canvas-space (adjust for zoom)
   const handleSizeCanvas = handleSize / state.document.viewport.zoom;
 
-  // ── Font size popup ──
-  // Mode-split: standalone text shows it on select; shape labels only while
-  // editing (so selection chrome stays geometry-only).
-  let fontSizePopup: React.ReactNode = null;
+  // ── Text size grip ──
+  // Replaces box handles for standalone text and sizes shape labels. While
+  // typing it shrinks to a quiet dot so the text stays the focus.
+  let textSizeGrip: React.ReactNode = null;
+  const zoom = state.document.viewport.zoom;
+  const beginHistory = () => dispatch({ type: "BEGIN_HISTORY" });
+  const endHistory = () => dispatch({ type: "END_HISTORY" });
   if (editingTarget) {
-    const anchor = canvasToScreen(
-      editingTarget.x + editingTarget.width / 2,
-      editingTarget.y,
-      state.document.viewport,
-      size,
-    );
-    fontSizePopup = (
-      <FontSizePopup
+    const bounds =
+      editingTarget.kind === "standalone-text"
+        ? {
+            x: editingTarget.x,
+            y: editingTarget.y,
+            width: editingTarget.width,
+            height: editingTarget.height,
+          }
+        : centeredLabelBounds(
+            editingTarget,
+            editingTarget.text,
+            editingTarget.fontSize,
+          );
+    textSizeGrip = (
+      <TextSizeGrip
+        bounds={bounds}
+        anchor={editingTarget.kind === "standalone-text" ? "top-left" : "center"}
         fontSize={editingTarget.fontSize}
-        screenX={anchor.x}
-        screenY={anchor.y}
+        zoom={zoom}
+        showFrame={editingTarget.kind === "shape-label"}
+        quiet
+        activityKey={editingTarget.text}
+        onStart={beginHistory}
         onChange={changeEditingFontSize}
+        onEnd={endHistory}
       />
     );
   } else if (singleSelectedElement?.type === "text") {
-    const bounds = getElementBounds(singleSelectedElement);
-    const anchor = canvasToScreen(
-      bounds.x + bounds.width / 2,
-      bounds.y,
-      state.document.viewport,
-      size,
-    );
-    fontSizePopup = (
-      <FontSizePopup
-        fontSize={singleSelectedElement.fontSize ?? DEFAULT_TEXT_FONT_SIZE}
-        screenX={anchor.x}
-        screenY={anchor.y}
-        onChange={(fontSize) => {
-          const textSize = measureDomTextSize(
-            singleSelectedElement.text,
-            fontSize,
-          );
+    const element = singleSelectedElement;
+    textSizeGrip = (
+      <TextSizeGrip
+        bounds={getElementBounds(element)}
+        anchor="top-left"
+        fontSize={element.fontSize ?? DEFAULT_TEXT_FONT_SIZE}
+        zoom={zoom}
+        onStart={beginHistory}
+        onChange={(next) => {
+          const size = measureDomTextSize(element.text, next);
           dispatch({
             type: "UPDATE_ELEMENT",
-            id: singleSelectedElement.id,
-            patch: {
-              fontSize,
-              width: textSize.width,
-              height: textSize.height,
-            },
+            id: element.id,
+            patch: { fontSize: next, width: size.width, height: size.height },
           });
         }}
+        onEnd={endHistory}
+      />
+    );
+  } else if (
+    singleSelectedElement &&
+    !isConnector(singleSelectedElement) &&
+    singleSelectedElement.text
+  ) {
+    const element = singleSelectedElement;
+    const fontSize = element.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE;
+    textSizeGrip = (
+      <TextSizeGrip
+        bounds={centeredLabelBounds(
+          getElementBounds(element),
+          element.text ?? "",
+          fontSize,
+        )}
+        anchor="center"
+        fontSize={fontSize}
+        zoom={zoom}
+        showFrame
+        onStart={beginHistory}
+        onChange={(next) =>
+          dispatch({
+            type: "UPDATE_ELEMENT",
+            id: element.id,
+            patch: { fontSize: next },
+          })
+        }
+        onEnd={endHistory}
       />
     );
   }
@@ -369,9 +408,10 @@ export function DiagramCanvas({
           {/* Marquee (box) selection preview */}
           {marqueeBounds && <MarqueeOverlay bounds={marqueeBounds} />}
 
-          {/* Resize handles for single selected element */}
+          {/* Resize handles for single selected shape (text uses its grip) */}
           {!editingTarget &&
             singleSelectedElement &&
+            singleSelectedElement.type !== "text" &&
             !isConnector(singleSelectedElement) && (
               <ResizeHandles
                 element={singleSelectedElement}
@@ -419,12 +459,14 @@ export function DiagramCanvas({
               onCommit={commitTextEditing}
               onCancel={cancelTextEditing}
               onLayoutChange={updateEditingLayout}
+              onTextChange={updateEditingText}
+              onFontSizeStep={stepEditingFontSize}
             />
           )}
-        </svg>
 
-        {/* Font size popup for the selected text-bearing element */}
-        {fontSizePopup}
+          {/* Drag-to-resize grip for label / edited text */}
+          {textSizeGrip}
+        </svg>
 
         {catalog.warnings.length > 0 && (
           <div
@@ -439,4 +481,19 @@ export function DiagramCanvas({
       </div>
     </div>
   );
+}
+
+/** Box a shape label's glyphs occupy, centered in the shape like TextRenderer. */
+function centeredLabelBounds(
+  shape: Bounds,
+  text: string,
+  fontSize: number,
+): Bounds {
+  const size = measureDomTextSize(text || " ", fontSize);
+  return {
+    x: shape.x + (shape.width - size.width) / 2,
+    y: shape.y + (shape.height - size.height) / 2,
+    width: size.width,
+    height: size.height,
+  };
 }
