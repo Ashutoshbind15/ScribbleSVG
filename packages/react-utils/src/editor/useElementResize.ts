@@ -314,6 +314,20 @@ function boundsToElementPatch(
       };
     }
 
+    case "freedraw": {
+      // Map each point from the start box into the new one. A flat side
+      // (straight stroke) has no extent to scale, so it just moves.
+      const from = resizeStartBounds;
+      const map = (v: number, start: number, size: number, next: number, nextSize: number) =>
+        size > 0 ? next + ((v - start) / size) * nextSize : v + (next - start);
+      return {
+        points: original.points.map(([x, y]) => [
+          map(x, from.x, from.width, bounds.x, bounds.width),
+          map(y, from.y, from.height, bounds.y, bounds.height),
+        ]),
+      };
+    }
+
     case "arrow":
     case "line":
       // Connectors aren't resized via handles

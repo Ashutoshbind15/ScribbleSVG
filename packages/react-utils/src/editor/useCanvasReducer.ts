@@ -17,7 +17,8 @@ export type ToolType =
   | "icon"
   | "text"
   | "arrow"
-  | "line";
+  | "line"
+  | "pencil";
 
 // ── History ──
 
@@ -37,6 +38,8 @@ export interface CanvasState {
   tool: ToolType;
   /** Catalog iconId used when the icon tool places a new element. */
   activeIconId: string | null;
+  /** Whether new pencil strokes are smoothed (corners are always kept). */
+  pencilSmoothing: boolean;
   past: HistorySnapshot[];
   future: HistorySnapshot[];
   /**
@@ -51,6 +54,7 @@ export interface CanvasState {
 export type CanvasAction =
   | { type: "SET_DOCUMENT"; document: DiagramDocument }
   | { type: "SET_TOOL"; tool: ToolType; activeIconId?: string | null }
+  | { type: "SET_PENCIL_SMOOTHING"; enabled: boolean }
   | { type: "SET_VIEWPORT"; viewport: Viewport }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
   | {
@@ -150,6 +154,9 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
             ? (action.activeIconId ?? state.activeIconId)
             : null,
       };
+
+    case "SET_PENCIL_SMOOTHING":
+      return { ...state, pencilSmoothing: action.enabled };
 
     case "SET_VIEWPORT":
       return {
@@ -307,6 +314,7 @@ const INITIAL_STATE: CanvasState = {
   selectedIds: new Set(),
   tool: "select",
   activeIconId: null,
+  pencilSmoothing: true,
   past: [],
   future: [],
   historyBatchDepth: 0,

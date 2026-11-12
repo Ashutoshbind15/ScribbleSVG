@@ -5,6 +5,7 @@ import type {
 } from "./types";
 import { isConnector } from "./types";
 import { DEFAULT_TEXT_FONT_SIZE } from "./constants";
+import { getStrokeBounds } from "./freedraw";
 
 // ── Bounding boxes ──
 
@@ -93,6 +94,9 @@ export function getElementBounds(el: DiagramElement): Bounds {
       const maxY = Math.max(el.startY, el.endY);
       return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     }
+
+    case "freedraw":
+      return getStrokeBounds(el.points);
   }
 }
 
@@ -144,7 +148,7 @@ export interface ConnectionPoint {
 export function getElementConnectionPoints(
   element: DiagramElement,
 ): ConnectionPoint[] {
-  if (isConnector(element)) return [];
+  if (isConnector(element) || element.type === "freedraw") return [];
 
   if (element.type === "circle") {
     const { cx, cy, radius } = element;

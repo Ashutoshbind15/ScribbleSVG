@@ -133,6 +133,22 @@ function isLineElement(value: Record<string, unknown>): boolean {
   );
 }
 
+function isFreedrawElement(value: Record<string, unknown>): boolean {
+  return (
+    value.type === "freedraw" &&
+    hasBaseFields(value) &&
+    Array.isArray(value.points) &&
+    value.points.length > 0 &&
+    value.points.every(
+      (point) =>
+        Array.isArray(point) &&
+        point.length === 2 &&
+        isNumber(point[0]) &&
+        isNumber(point[1]),
+    )
+  );
+}
+
 function isDiagramElement(value: unknown): value is DiagramElement {
   if (!isRecord(value)) return false;
 
@@ -153,6 +169,8 @@ function isDiagramElement(value: unknown): value is DiagramElement {
       return isArrowElement(value);
     case "line":
       return isLineElement(value);
+    case "freedraw":
+      return isFreedrawElement(value);
     default:
       return false;
   }

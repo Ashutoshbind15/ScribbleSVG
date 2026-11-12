@@ -7,8 +7,10 @@ import type {
   DiamondElement,
   ArrowElement,
   LineElement,
+  FreedrawElement,
 } from "./types";
 import { getDiamondVertices, getElementBounds } from "./geometry";
+import { FREEDRAW_STROKE_WIDTH, getStrokePathData } from "./freedraw";
 
 // ── Public types ──
 
@@ -21,6 +23,8 @@ export interface RoughPathData {
   stroke: string;
   strokeWidth: number;
   fill: string;
+  /** Freehand stroke: draw with round caps/joins and never fill it. */
+  freehand?: boolean;
 }
 
 // ── Generator (singleton, stateless — seed is per-call) ──
@@ -51,6 +55,8 @@ export function getElementRoughPaths(element: DiagramElement): RoughPathData[] {
       return getArrowPaths(element);
     case "line":
       return getLinePaths(element);
+    case "freedraw":
+      return getFreedrawPaths(element);
     case "icon":
     case "text":
       // Icons are rendered from consumer SVG catalogs; text is plain SVG.
@@ -171,6 +177,19 @@ function getArrowPaths(el: ArrowElement): RoughPathData[] {
   paths.push(...generator.toPaths(head2).map(normalizePathInfo));
 
   return paths;
+}
+
+function getFreedrawPaths(el: FreedrawElement): RoughPathData[] {
+  // Already hand-drawn; extra roughness would only fight the smoothing.
+  return [
+    {
+      d: getStrokePathData(el.points),
+      stroke: "#000",
+      strokeWidth: FREEDRAW_STROKE_WIDTH,
+      fill: "none",
+      freehand: true,
+    },
+  ];
 }
 
 // ── Helpers ──

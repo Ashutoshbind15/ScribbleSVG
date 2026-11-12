@@ -2,7 +2,10 @@ import {
   getElementBounds,
   getElementCenter,
   getElementConnectionPoints,
+  isBindable,
   isConnector,
+  FREEDRAW_STROKE_WIDTH,
+  type BindableElement,
   type Bounds,
   type CylinderElement,
   type DiagramElement,
@@ -30,7 +33,7 @@ export function hitTest(
 }
 
 function strictlyContains(outer: DiagramElement, inner: DiagramElement): boolean {
-  if (isConnector(outer)) return false;
+  if (!isBindable(outer)) return false;
   const a = getElementBounds(outer);
   const b = getElementBounds(inner);
   if (
@@ -66,20 +69,20 @@ export function hitTestTextTarget(
   point: { x: number; y: number },
   elements: DiagramElement[],
   zoom: number,
-): Exclude<DiagramElement, { type: "arrow" | "line" }> | null {
+): BindableElement | null {
   const top = hitTest(point, elements);
   if (top?.type === "text") return top;
   // Deepest shape whose center hotspot holds the point — a container's center
   // still hits when it happens to sit inside a nested child's body.
   const centered = elements.filter(
     (element) =>
-      !isConnector(element) &&
+      isBindable(element) &&
       element.type !== "text" &&
       hitTestElement(point, element) &&
       inCenterHotspot(point, element, zoom),
   );
   const target = hitTest(point, centered);
-  return target && !isConnector(target) ? target : null;
+  return target && isBindable(target) ? target : null;
 }
 
 function inCenterHotspot(
@@ -189,6 +192,13 @@ export function hitTestOutline(
         Math.max(tolerance, CONNECTOR_HIT_THRESHOLD),
       );
 
+    case "freedraw":
+      return pointNearStroke(
+        point,
+        element.points,
+        Math.max(tolerance, CONNECTOR_HIT_THRESHOLD) + FREEDRAW_STROKE_WIDTH / 2,
+      );
+
     case "circle":
       return Math.abs(Math.hypot(point.x - element.cx, point.y - element.cy) - element.radius) <= tolerance;
 
@@ -265,6 +275,13 @@ export function hitTestElement(
         { x: element.startX, y: element.startY },
         { x: element.endX, y: element.endY },
         CONNECTOR_HIT_THRESHOLD,
+      );
+
+    case "freedraw":
+      return pointNearStroke(
+        point,
+        element.points,
+        CONNECTOR_HIT_THRESHOLD + FREEDRAW_STROKE_WIDTH / 2,
       );
   }
 }
@@ -489,6 +506,9 @@ function elementIntersectsMarquee(
         marquee,
       );
 
+    case "freedraw":
+      return strokeIntersectsRect(element.points, marquee);
+
     case "icon":
     case "text":
       return boundsIntersect(getElementBounds(element), marquee);
@@ -648,6 +668,41 @@ function pointInCircle(
 
 function rectCorners({ x, y, width, height }: Bounds): { x: number; y: number }[] {
   return [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }];
+}
+
+function pointNearStroke(
+  point: { x: number; y: number },
+  points: [number, number][],
+  threshold: number,
+): boolean {
+  if (points.length === 1) {
+    const [x, y] = points[0]!;
+    return Math.hypot(point.x - x, point.y - y) <= threshold;
+  }
+  for (let i = 1; i < points.length; i++) {
+    const [ax, ay] = points[i - 1]!;
+    const [bx, by] = points[i]!;
+    if (pointNearLineSegment(point, { x: ax, y: ay }, { x: bx, y: by }, threshold)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** True if any part of the stroke's polyline touches or lies inside `rect`. */
+function strokeIntersectsRect(points: [number, number][], rect: Bounds): boolean {
+  if (points.length === 1) {
+    const [x, y] = points[0]!;
+    return pointInRect({ x, y }, rect);
+  }
+  for (let i = 1; i < points.length; i++) {
+    const [ax, ay] = points[i - 1]!;
+    const [bx, by] = points[i]!;
+    if (lineSegmentIntersectsRect({ x: ax, y: ay }, { x: bx, y: by }, rect)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function pointNearPolygon(

@@ -104,6 +104,11 @@ export function translateElement<T extends DiagramElement>(
         endX: el.endX + dx,
         endY: el.endY + dy,
       };
+    case "freedraw":
+      return {
+        ...el,
+        points: el.points.map(([x, y]) => [x + dx, y + dy]),
+      };
   }
 }
 

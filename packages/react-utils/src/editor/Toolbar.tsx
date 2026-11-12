@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { parseIconSvg, type DiagramIcon } from "../icons";
 import type { ToolType } from "./useCanvasReducer";
 import {
@@ -6,8 +7,10 @@ import {
   CylinderIcon,
   DiamondIcon,
   LineIcon,
+  PencilIcon,
   RectangleIcon,
   SelectIcon,
+  SmoothingIcon,
   TextIcon,
   type ToolbarIconProps,
 } from "./toolbarIcons";
@@ -18,6 +21,9 @@ interface ToolbarProps {
   /** Valid catalog icons to expose as placement tools (SVG previews). */
   catalogIcons?: DiagramIcon[];
   onToolChange: (tool: ToolType, activeIconId?: string | null) => void;
+  /** Whether pencil strokes are smoothed; the toggle shows while drawing. */
+  pencilSmoothing?: boolean;
+  onPencilSmoothingChange?: (enabled: boolean) => void;
 }
 
 const BUILTIN_TOOLS: {
@@ -31,6 +37,7 @@ const BUILTIN_TOOLS: {
   { type: "cylinder", label: "Cylinder", Icon: CylinderIcon },
   { type: "diamond", label: "Diamond", Icon: DiamondIcon },
   { type: "text", label: "Text", Icon: TextIcon },
+  { type: "pencil", label: "Pencil", Icon: PencilIcon },
   { type: "line", label: "Line", Icon: LineIcon },
   { type: "arrow", label: "Arrow", Icon: ArrowIcon },
 ];
@@ -44,6 +51,8 @@ export function Toolbar({
   activeIconId,
   catalogIcons = [],
   onToolChange,
+  pencilSmoothing,
+  onPencilSmoothingChange,
 }: ToolbarProps) {
   // Select + shapes before catalog icons; text + connectors after
   const beforeText = BUILTIN_TOOLS.slice(0, 5);
@@ -96,16 +105,32 @@ export function Toolbar({
       })}
 
       {afterShapes.map(({ type, label, Icon }) => (
-        <button
-          key={type}
-          type="button"
-          title={label}
-          aria-label={label}
-          aria-pressed={activeTool === type}
-          onClick={() => onToolChange(type)}
-        >
-          <Icon />
-        </button>
+        <Fragment key={type}>
+          <button
+            type="button"
+            title={label}
+            aria-label={label}
+            aria-pressed={activeTool === type}
+            onClick={() => onToolChange(type)}
+          >
+            <Icon />
+          </button>
+          {type === "pencil" &&
+            activeTool === "pencil" &&
+            pencilSmoothing !== undefined &&
+            onPencilSmoothingChange && (
+              <button
+                type="button"
+                className="scribblesvg-editor__toolbar-option"
+                title={pencilSmoothing ? "Smoothing on" : "Smoothing off"}
+                aria-label="Smooth strokes"
+                aria-pressed={pencilSmoothing}
+                onClick={() => onPencilSmoothingChange(!pencilSmoothing)}
+              >
+                <SmoothingIcon />
+              </button>
+            )}
+        </Fragment>
       ))}
     </div>
   );

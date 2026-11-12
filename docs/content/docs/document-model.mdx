@@ -29,6 +29,7 @@ Use `EMPTY_DOCUMENT` from `@scribblesvg/core` as a starting point. Validate untr
 | `text` | Standalone text |
 | `arrow` | Connector with arrowheads |
 | `line` | Straight connector without heads |
+| `freedraw` | Freehand pencil stroke |
 
 All elements share `id` (UUID) and `seed` (Rough.js determinism). Shapes store geometry (`x`/`y`/`width`/`height` or `cx`/`cy`/`radius`) and optional `text` / `fontSize`. Standalone `text` elements may also store `width` / `height` synced from the editor’s real glyph metrics; when omitted, core falls back to `measureTextSize`.
 
@@ -42,6 +43,16 @@ endBinding?: string;
 ```
 
 When bound, the editor keeps the endpoint attached to the target shape.
+
+## Freehand strokes
+
+Pencil strokes store their points in canvas coordinates:
+
+```ts
+points: [number, number][]; // at least one; a single point is a dot
+```
+
+Core draws them as one smooth path (`getStrokePathData`): curved where the stroke flows, with sharp joins where it turns hard. Strokes have no label and connectors don't bind to them. `smoothStroke` and `dedupeStroke` are exported if you build strokes yourself.
 
 ## Icons
 

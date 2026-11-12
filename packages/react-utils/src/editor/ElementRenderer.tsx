@@ -63,6 +63,8 @@ export function ElementRenderer({
             stroke={p.stroke}
             strokeWidth={p.strokeWidth}
             fill={p.fill}
+            strokeLinecap={p.freehand ? "round" : undefined}
+            strokeLinejoin={p.freehand ? "round" : undefined}
             pointerEvents="none"
           />
         ))

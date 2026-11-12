@@ -11,6 +11,8 @@ import { measureDomTextSize } from "./measureDomText";
 
 /** Smallest box edge a shape may shrink to during a group scale. */
 const MIN_SHAPE_SIZE = 20;
+/** Smallest length a freehand stroke may shrink to during a group scale. */
+const MIN_STROKE_SIZE = 4;
 /** Smallest font size a group scale may produce. */
 const MIN_FONT_SIZE = 8;
 
@@ -34,6 +36,13 @@ export function getMinGroupScale(elements: DiagramElement[]): number {
   let min = 0.05;
   for (const el of elements) {
     if (isConnector(el)) continue;
+    if (el.type === "freedraw") {
+      // A stroke's short edge may be ~0 (a straight scribble); bound its length.
+      const { width, height } = getElementBounds(el);
+      const longEdge = Math.max(width, height);
+      if (longEdge > 0) min = Math.max(min, MIN_STROKE_SIZE / longEdge);
+      continue;
+    }
     if (el.type === "text") {
       const fontSize = el.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
       min = Math.max(min, MIN_FONT_SIZE / fontSize);
@@ -140,6 +149,12 @@ export function getGroupScalePatches(
             endX: sx(el.endX),
             endY: sy(el.endY),
           },
+        };
+
+      case "freedraw":
+        return {
+          id: el.id,
+          patch: { points: el.points.map(([x, y]) => [sx(x), sy(y)]) },
         };
     }
   });

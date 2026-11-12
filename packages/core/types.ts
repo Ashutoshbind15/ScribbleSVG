@@ -8,7 +8,8 @@ export type ElementType =
   | "icon"
   | "text"
   | "arrow"
-  | "line";
+  | "line"
+  | "freedraw";
 
 // Base element (all elements extend this)
 export interface BaseElement {
@@ -113,6 +114,15 @@ export interface LineElement extends BaseElement {
 
 export type ConnectorElement = ArrowElement | LineElement;
 
+// Freehand strokes
+
+/** Pencil stroke; points are canvas coordinates, drawn as one smooth path. */
+export interface FreedrawElement extends BaseElement {
+  type: "freedraw";
+  /** At least one [x, y] point; a single point renders as a dot. */
+  points: [number, number][];
+}
+
 // Union type
 
 export type DiagramElement =
@@ -123,10 +133,14 @@ export type DiagramElement =
   | IconElement
   | TextElement
   | ArrowElement
-  | LineElement;
+  | LineElement
+  | FreedrawElement;
 
 /** Elements that can receive arrow/line bindings. */
-export type BindableElement = Exclude<DiagramElement, ConnectorElement>;
+export type BindableElement = Exclude<
+  DiagramElement,
+  ConnectorElement | FreedrawElement
+>;
 
 /** True for arrow/line connectors (not bind targets). */
 export function isConnector(el: DiagramElement): el is ConnectorElement {
@@ -135,7 +149,7 @@ export function isConnector(el: DiagramElement): el is ConnectorElement {
 
 /** True for shapes/text that connectors can bind to. */
 export function isBindable(el: DiagramElement): el is BindableElement {
-  return !isConnector(el);
+  return !isConnector(el) && el.type !== "freedraw";
 }
 
 // Viewport

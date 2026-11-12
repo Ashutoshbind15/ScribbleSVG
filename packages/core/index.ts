@@ -11,6 +11,7 @@ export type {
   ArrowElement,
   LineElement,
   ConnectorElement,
+  FreedrawElement,
   BindableElement,
   DiagramElement,
   Viewport,
@@ -36,6 +37,16 @@ export {
   constrainToStraightAngle,
   scaleFontSizeForResize,
 } from "./geometry";
+
+// Freehand strokes
+export type { StrokePoint } from "./freedraw";
+export {
+  FREEDRAW_STROKE_WIDTH,
+  dedupeStroke,
+  smoothStroke,
+  getStrokePathData,
+  getStrokeBounds,
+} from "./freedraw";
 
 // Rendering
 export type { RoughPathData } from "./render";

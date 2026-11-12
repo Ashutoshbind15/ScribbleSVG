@@ -4,6 +4,7 @@ import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
+  isBindable,
   isConnector,
   type Bounds,
   type DiagramDocument,
@@ -306,7 +307,7 @@ export function DiagramCanvas({
     );
   } else if (
     singleSelectedElement &&
-    !isConnector(singleSelectedElement) &&
+    isBindable(singleSelectedElement) &&
     singleSelectedElement.text
   ) {
     const element = singleSelectedElement;
@@ -346,6 +347,10 @@ export function DiagramCanvas({
           catalogIcons={catalog.valid}
           onToolChange={(tool, activeIconId) =>
             dispatch({ type: "SET_TOOL", tool, activeIconId })
+          }
+          pencilSmoothing={state.pencilSmoothing}
+          onPencilSmoothingChange={(enabled) =>
+            dispatch({ type: "SET_PENCIL_SMOOTHING", enabled })
           }
         />
         <div className="scribblesvg-editor__history">

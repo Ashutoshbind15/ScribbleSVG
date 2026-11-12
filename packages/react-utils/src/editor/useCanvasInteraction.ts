@@ -2,15 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
+  dedupeStroke,
   generateSeed,
   getElementBounds,
+  isBindable,
   isConnector,
+  smoothStroke,
+  type StrokePoint,
   type Bounds,
   type CircleElement,
   type CylinderElement,
   type DiagramDocument,
   type DiagramElement,
   type DiamondElement,
+  type FreedrawElement,
   type IconElement,
   type RectangleElement,
   type TextElement,
@@ -68,6 +73,13 @@ function readLiveEditorText(fallback: string): string {
   return textarea instanceof HTMLTextAreaElement ? textarea.value : fallback;
 }
 
+/** Stroke points to store: smoothed, or just de-duplicated when smoothing is off. */
+function processStroke(stroke: StrokeState): StrokePoint[] {
+  return stroke.smoothing
+    ? smoothStroke(stroke.rawPoints, stroke.tolerance)
+    : dedupeStroke(stroke.rawPoints, stroke.tolerance);
+}
+
 function isConnectorTool(tool: ToolType): tool is "arrow" | "line" {
   return tool === "arrow" || tool === "line";
 }
@@ -81,6 +93,7 @@ type InteractionMode =
   | "dragging"
   | "resizing"
   | "creating" // click-drag to define size
+  | "drawing" // pencil stroke
   | "marqueeing"; // drag a virtual rect to multi-select
 
 interface CreationState {
@@ -88,6 +101,15 @@ interface CreationState {
   startPoint: { x: number; y: number };
   elementId: string;
   seed: number;
+}
+
+interface StrokeState {
+  elementId: string;
+  /** Every sampled pointer position; the element shows the processed result. */
+  rawPoints: StrokePoint[];
+  /** One screen pixel in canvas units at stroke start. */
+  tolerance: number;
+  smoothing: boolean;
 }
 
 interface MarqueeState {
@@ -120,7 +142,8 @@ export function useCanvasInteraction(
   containerSize: { width: number; height: number },
   icons?: DiagramIcon[],
 ) {
-  const { document: doc, selectedIds, tool, activeIconId } = state;
+  const { document: doc, selectedIds, tool, activeIconId, pencilSmoothing } =
+    state;
   const elements = doc.elements;
   const viewport = doc.viewport;
 
@@ -192,6 +215,9 @@ export function useCanvasInteraction(
 
   // Creation drag state
   const creationRef = useRef<CreationState | null>(null);
+
+  // Pencil stroke in progress
+  const strokeRef = useRef<StrokeState | null>(null);
 
   // Marquee (box) selection state
   const marqueeRef = useRef<MarqueeState | null>(null);
@@ -297,7 +323,7 @@ export function useCanvasInteraction(
             id: el.id,
             patch: { fontSize, width: size.width, height: size.height },
           });
-        } else if (!isConnector(el) && el.text) {
+        } else if (isBindable(el) && el.text) {
           updates.push({
             id: el.id,
             patch: {
@@ -750,6 +776,31 @@ export function useCanvasInteraction(
         return;
       }
 
+      // Pencil: each press-drag is one stroke; the tool stays active
+      if (tool === "pencil") {
+        e.preventDefault();
+        const elementId = crypto.randomUUID();
+        const start: StrokePoint = [canvasPoint.x, canvasPoint.y];
+        const element: FreedrawElement = {
+          id: elementId,
+          type: "freedraw",
+          seed: generateSeed(),
+          points: [start],
+        };
+        strokeRef.current = {
+          elementId,
+          rawPoints: [start],
+          tolerance: 1 / viewport.zoom,
+          smoothing: pencilSmoothing,
+        };
+        setMode("drawing");
+        dispatch({ type: "BEGIN_HISTORY" });
+        dispatch({ type: "ADD_ELEMENT", element });
+        if (selectedIds.size > 0) dispatch({ type: "CLEAR_SELECTION" });
+        svg.setPointerCapture(e.pointerId);
+        return;
+      }
+
       // Creation tools: rectangle, circle, cylinder, diamond, icon (requires activeIconId)
       if (
         tool === "rectangle" ||
@@ -989,6 +1040,7 @@ export function useCanvasInteraction(
       commitTextEditing,
       activeIconId,
       icons,
+      pencilSmoothing,
     ],
   );
 
@@ -1078,6 +1130,22 @@ export function useCanvasInteraction(
           type: "UPDATE_ELEMENT",
           id: creation.elementId,
           patch,
+        });
+        return;
+      }
+
+      if (mode === "drawing" && strokeRef.current) {
+        const stroke = strokeRef.current;
+        // Coalesced samples keep fast strokes from turning into polygons.
+        const samples = e.nativeEvent.getCoalescedEvents?.() ?? [];
+        for (const sample of samples.length > 0 ? samples : [e.nativeEvent]) {
+          const point = getCanvasPoint(sample);
+          stroke.rawPoints.push([point.x, point.y]);
+        }
+        dispatch({
+          type: "UPDATE_ELEMENT",
+          id: stroke.elementId,
+          patch: { points: processStroke(stroke) },
         });
         return;
       }
@@ -1175,6 +1243,22 @@ export function useCanvasInteraction(
       if (mode === "creating") {
         creationRef.current = null;
         setMode("none");
+        dispatch({ type: "END_HISTORY" });
+        svg.releasePointerCapture(e.pointerId);
+        return;
+      }
+
+      if (mode === "drawing") {
+        const stroke = strokeRef.current;
+        strokeRef.current = null;
+        setMode("none");
+        if (stroke) {
+          dispatch({
+            type: "UPDATE_ELEMENT",
+            id: stroke.elementId,
+            patch: { points: processStroke(stroke) },
+          });
+        }
         dispatch({ type: "END_HISTORY" });
         svg.releasePointerCapture(e.pointerId);
         return;

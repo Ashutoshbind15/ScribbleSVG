@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import type { DiagramElement } from "@scribblesvg/core";
 import type { CanvasAction } from "./useCanvasReducer";
+import { translateElement } from "./clipboard";
 import {
   applyElementPatches,
   dispatchBoundArrowAnchorUpdates,
@@ -12,8 +13,8 @@ interface DragState {
   elementIds: string[];
   /** Canvas-space position where drag started */
   startCanvasPoint: { x: number; y: number };
-  /** Snapshot of element positions at drag start (id → {x, y} or equivalent) */
-  startPositions: Map<string, Record<string, number>>;
+  /** Snapshot of each dragged element at drag start */
+  startElements: Map<string, DiagramElement>;
 }
 
 /**
@@ -28,39 +29,16 @@ export function useElementDrag(
 
   const startDrag = useCallback(
     (elementIds: string[], canvasPoint: { x: number; y: number }) => {
-      const startPositions = new Map<string, Record<string, number>>();
-
+      const startElements = new Map<string, DiagramElement>();
       for (const id of elementIds) {
         const el = elements.find((e) => e.id === id);
-        if (!el) continue;
-
-        switch (el.type) {
-          case "rectangle":
-          case "cylinder":
-          case "diamond":
-          case "icon":
-          case "text":
-            startPositions.set(id, { x: el.x, y: el.y });
-            break;
-          case "circle":
-            startPositions.set(id, { cx: el.cx, cy: el.cy });
-            break;
-          case "arrow":
-          case "line":
-            startPositions.set(id, {
-              startX: el.startX,
-              startY: el.startY,
-              endX: el.endX,
-              endY: el.endY,
-            });
-            break;
-        }
+        if (el) startElements.set(id, el);
       }
 
       dragRef.current = {
         elementIds,
         startCanvasPoint: canvasPoint,
-        startPositions,
+        startElements,
       };
       dispatch({ type: "BEGIN_HISTORY" });
     },
@@ -76,44 +54,8 @@ export function useElementDrag(
       const dy = canvasPoint.y - drag.startCanvasPoint.y;
 
       const updates: { id: string; patch: Partial<DiagramElement> }[] = [];
-
-      for (const id of drag.elementIds) {
-        const startPos = drag.startPositions.get(id);
-        if (!startPos) continue;
-
-        const el = elements.find((e) => e.id === id);
-        if (!el) continue;
-
-        switch (el.type) {
-          case "rectangle":
-          case "cylinder":
-          case "diamond":
-          case "icon":
-          case "text":
-            updates.push({
-              id,
-              patch: { x: startPos.x + dx, y: startPos.y + dy },
-            });
-            break;
-          case "circle":
-            updates.push({
-              id,
-              patch: { cx: startPos.cx + dx, cy: startPos.cy + dy },
-            });
-            break;
-          case "arrow":
-          case "line":
-            updates.push({
-              id,
-              patch: {
-                startX: startPos.startX + dx,
-                startY: startPos.startY + dy,
-                endX: startPos.endX + dx,
-                endY: startPos.endY + dy,
-              },
-            });
-            break;
-        }
+      for (const [id, start] of drag.startElements) {
+        updates.push({ id, patch: translateElement(start, dx, dy) });
       }
 
       if (updates.length > 0) {

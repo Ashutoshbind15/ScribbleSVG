@@ -164,8 +164,14 @@ export function DiagramRenderer({
                   d={path.d}
                   stroke={resolvedColors.stroke}
                   strokeWidth={path.strokeWidth}
+                  strokeLinecap={path.freehand ? "round" : undefined}
+                  strokeLinejoin={path.freehand ? "round" : undefined}
                   fill={
-                    path.fill === "none" ? resolvedColors.fill : path.fill
+                    path.freehand
+                      ? "none"
+                      : path.fill === "none"
+                        ? resolvedColors.fill
+                        : path.fill
                   }
                 />
               ))

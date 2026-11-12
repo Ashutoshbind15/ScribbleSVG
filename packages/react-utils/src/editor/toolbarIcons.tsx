@@ -87,6 +87,25 @@ export function TextIcon({ className }: ToolbarIconProps) {
   );
 }
 
+/** Pencil — slanted body with a sharpened tip. */
+export function PencilIcon({ className }: ToolbarIconProps) {
+  return (
+    <IconBase className={className}>
+      <path d="M15 4 L20 9 L9 20 H4 V15 Z" />
+      <line x1="12.5" y1="6.5" x2="17.5" y2="11.5" />
+    </IconBase>
+  );
+}
+
+/** Smoothing — a jagged trace beside the clean curve it becomes. */
+export function SmoothingIcon({ className }: ToolbarIconProps) {
+  return (
+    <IconBase className={className}>
+      <path d="M3 16 C7 6, 11 6, 13 12 S19 18, 21 8" strokeLinecap="round" />
+    </IconBase>
+  );
+}
+
 export function LineIcon({ className }: ToolbarIconProps) {
   return (
     <IconBase className={className}>
