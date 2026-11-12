@@ -63,6 +63,7 @@ export function getElementBounds(el: DiagramElement): Bounds {
     case "rectangle":
     case "cylinder":
     case "diamond":
+    case "image":
     case "icon":
       return { x: el.x, y: el.y, width: el.width, height: el.height };
 
