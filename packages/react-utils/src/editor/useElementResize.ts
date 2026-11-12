@@ -3,6 +3,7 @@ import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
+  isLabeledShape,
   scaleFontSizeForResize,
   type Bounds,
   type DiagramElement,
@@ -15,6 +16,7 @@ import {
   getBoundArrowAnchorUpdates,
 } from "./arrowAnchors";
 import { measureDomTextSize } from "./measureDomText";
+import { isCornerHandle, lockAspectRatio } from "./aspect-ratio";
 import {
   computeGroupScale,
   getGroupScalePatches,
@@ -106,8 +108,12 @@ export function useElementResize(
     [elements, dispatch],
   );
 
+  /**
+   * `freeAspect` (Shift) lets an image's corner handles stretch it; without
+   * it they keep the image's aspect ratio.
+   */
   const continueResize = useCallback(
-    (canvasPoint: { x: number; y: number }, shiftKey = false) => {
+    (canvasPoint: { x: number; y: number }, freeAspect = false) => {
       const resize = resizeRef.current;
       if (!resize) return;
 
@@ -149,12 +155,17 @@ export function useElementResize(
         dx,
         dy,
       );
-
-      if (resize.originalElement.type === "image" && !shiftKey && resize.handle.length === 2) {
-        const start = resize.startBounds;
-        const scale = Math.max(MIN_SIZE / start.width, MIN_SIZE / start.height, Math.max(newBounds.width / start.width, newBounds.height / start.height));
-        const width = start.width * scale, height = start.height * scale;
-        newBounds = { x: resize.handle.includes("w") ? start.x + start.width - width : start.x, y: resize.handle.includes("n") ? start.y + start.height - height : start.y, width, height };
+      if (
+        resize.originalElement.type === "image" &&
+        !freeAspect &&
+        isCornerHandle(resize.handle)
+      ) {
+        newBounds = lockAspectRatio(
+          resize.startBounds,
+          newBounds,
+          resize.handle,
+          MIN_SIZE,
+        );
       }
 
       const patch = boundsToElementPatch(
@@ -265,20 +276,13 @@ function boundsToElementPatch(
     case "diamond":
     case "image":
     case "icon": {
-      const patch: Partial<DiagramElement> = {
+      return {
         x: bounds.x,
         y: bounds.y,
         width: bounds.width,
         height: bounds.height,
+        ...scaledLabelFont(original, bounds, resizeStartBounds),
       };
-      if ("text" in original && original.text) {
-        Object.assign(patch, { fontSize: scaleFontSizeForResize(
-          original.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
-          bounds,
-          resizeStartBounds,
-        ) });
-      }
-      return patch;
     }
 
     case "circle": {
@@ -287,19 +291,12 @@ function boundsToElementPatch(
         MIN_SIZE / 2,
         Math.min(bounds.width, bounds.height) / 2,
       );
-      const patch: Partial<DiagramElement> = {
+      return {
         cx: bounds.x + bounds.width / 2,
         cy: bounds.y + bounds.height / 2,
         radius,
+        ...scaledLabelFont(original, bounds, resizeStartBounds),
       };
-      if ("text" in original && original.text) {
-        Object.assign(patch, { fontSize: scaleFontSizeForResize(
-          original.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
-          bounds,
-          resizeStartBounds,
-        ) });
-      }
-      return patch;
     }
 
     case "text": {
@@ -327,6 +324,22 @@ function boundsToElementPatch(
       // Connectors aren't resized via handles
       return null;
   }
+}
+
+/** `fontSize` patch that scales a shape's label with its box, if it has one. */
+function scaledLabelFont(
+  element: DiagramElement,
+  bounds: Bounds,
+  resizeStartBounds: Bounds,
+): { fontSize?: number } {
+  if (!isLabeledShape(element) || !element.text) return {};
+  return {
+    fontSize: scaleFontSizeForResize(
+      element.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
+      bounds,
+      resizeStartBounds,
+    ),
+  };
 }
 
 /**

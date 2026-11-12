@@ -3,6 +3,7 @@ import {
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
   isConnector,
+  isLabeledShape,
   type Bounds,
   type DiagramElement,
 } from "@scribblesvg/core";
@@ -79,6 +80,10 @@ export function getGroupScalePatches(
   const sy = (y: number) => anchor.y + (y - anchor.y) * scale;
   const scaleFont = (fontSize: number) =>
     Math.max(MIN_FONT_SIZE, fontSize * scale);
+  const scaledLabelFont = (el: DiagramElement): { fontSize?: number } =>
+    isLabeledShape(el) && el.text
+      ? { fontSize: scaleFont(el.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE) }
+      : {};
 
   return elements.map((el): { id: string; patch: Partial<DiagramElement> } => {
     switch (el.type) {
@@ -87,32 +92,28 @@ export function getGroupScalePatches(
       case "diamond":
       case "image":
       case "icon": {
-        const patch: Partial<DiagramElement> = {
-          x: sx(el.x),
-          y: sy(el.y),
-          width: el.width * scale,
-          height: el.height * scale,
+        return {
+          id: el.id,
+          patch: {
+            x: sx(el.x),
+            y: sy(el.y),
+            width: el.width * scale,
+            height: el.height * scale,
+            ...scaledLabelFont(el),
+          },
         };
-        if ("text" in el && el.text) {
-          Object.assign(patch, { fontSize: scaleFont(
-            el.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
-          ) });
-        }
-        return { id: el.id, patch };
       }
 
       case "circle": {
-        const patch: Partial<DiagramElement> = {
-          cx: sx(el.cx),
-          cy: sy(el.cy),
-          radius: el.radius * scale,
+        return {
+          id: el.id,
+          patch: {
+            cx: sx(el.cx),
+            cy: sy(el.cy),
+            radius: el.radius * scale,
+            ...scaledLabelFont(el),
+          },
         };
-        if ("text" in el && el.text) {
-          Object.assign(patch, { fontSize: scaleFont(
-            el.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
-          ) });
-        }
-        return { id: el.id, patch };
       }
 
       case "text": {

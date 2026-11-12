@@ -1,6 +1,7 @@
 import {
   generateSeed,
   isConnector,
+  isDiagramElement,
   type ConnectorElement,
   type DiagramElement,
 } from "@scribblesvg/core";
@@ -174,11 +175,13 @@ export function parseClipboard(raw: string): DiagramElement[] | null {
     if (
       parsed?.type !== CLIPBOARD_MIME ||
       parsed.version !== 1 ||
-      !Array.isArray(parsed.elements)
+      !Array.isArray(parsed.elements) ||
+      // Clipboard text is untrusted: one bad element rejects the paste.
+      !parsed.elements.every(isDiagramElement)
     ) {
       return null;
     }
-    return parsed.elements as DiagramElement[];
+    return parsed.elements;
   } catch {
     return null;
   }

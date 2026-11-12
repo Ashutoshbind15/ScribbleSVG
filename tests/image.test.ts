@@ -50,3 +50,56 @@ test("isDiagramElement rejects image elements with disallowed sources", async ()
   assert.equal(isDiagramElement(image), true);
   assert.equal(isDiagramElement({ ...image, src: "blob:https://example.com/a" }), false);
 });
+
+test("image sources that browsers would rewrite or send off-host are rejected", () => {
+  const allowed = [
+    "my photo.png",
+    "HTTPS://example.com/a.png",
+    `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"></svg>`,
+  ];
+  for (const src of allowed) assert.equal(valid({ ...image, src }), true, src);
+
+  const rejected = [
+    " javascript:alert(1)",
+    "java\tscript:alert(1)",
+    "photo.png\n",
+    "\\\\example.com/a.png",
+    "/\\example.com/a.png",
+    "https://",
+  ];
+  for (const src of rejected) assert.equal(valid({ ...image, src }), false, JSON.stringify(src));
+});
+
+test("element types are looked up safely", async () => {
+  const { isDiagramElement } = await import("../packages/core/validation");
+  for (const type of ["toString", "__proto__", "constructor", undefined]) {
+    assert.equal(isDiagramElement({ ...image, type }), false, String(type));
+  }
+});
+
+test("pasting rejects clipboard payloads with invalid elements", async () => {
+  const { parseClipboard, serializeClipboard } = await import("../packages/react-utils/src/editor/clipboard");
+  assert.deepEqual(parseClipboard(serializeClipboard([image])), [image]);
+  const bad = { ...image, src: "javascript:alert(1)" };
+  assert.equal(parseClipboard(serializeClipboard([image, bad as ImageElement])), null);
+  assert.equal(parseClipboard("null"), null);
+});
+
+test("corner resizes of images keep their aspect ratio", async () => {
+  const { lockAspectRatio } = await import("../packages/react-utils/src/editor/aspect-ratio");
+  const start = { x: 0, y: 0, width: 200, height: 100 };
+
+  // The axis stretched further wins; the opposite corner stays put.
+  assert.deepEqual(lockAspectRatio(start, { x: 0, y: 0, width: 300, height: 110 }, "se", 20), { x: 0, y: 0, width: 300, height: 150 });
+  assert.deepEqual(lockAspectRatio(start, { x: -100, y: -60, width: 300, height: 160 }, "nw", 20), { x: -120, y: -60, width: 320, height: 160 });
+
+  // Shrinking stops once the short side reaches the minimum size.
+  assert.deepEqual(lockAspectRatio(start, { x: 0, y: 0, width: 20, height: 20 }, "se", 20), { x: 0, y: 0, width: 40, height: 20 });
+});
+
+test("only shapes carry labels", async () => {
+  const { isLabeledShape } = await import("../packages/core/types");
+  assert.equal(isLabeledShape(image), false);
+  assert.equal(isLabeledShape({ type: "rectangle", id: "r", seed: 1, x: 0, y: 0, width: 1, height: 1 }), true);
+  assert.equal(isLabeledShape({ type: "text", id: "t", seed: 1, x: 0, y: 0, text: "hi" }), false);
+});

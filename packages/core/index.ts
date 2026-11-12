@@ -13,11 +13,12 @@ export type {
   LineElement,
   ConnectorElement,
   BindableElement,
+  LabeledShapeElement,
   DiagramElement,
   Viewport,
   DiagramDocument,
 } from "./types";
-export { isConnector, isBindable } from "./types";
+export { isConnector, isBindable, isLabeledShape } from "./types";
 
 // Validation
 export {
