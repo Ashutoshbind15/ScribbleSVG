@@ -1,4 +1,3 @@
-import { ImageArtwork } from "./ImageArtwork";
 import { useMemo } from "react";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
@@ -10,6 +9,7 @@ import {
 } from "@scribblesvg/core";
 import type { DiagramIcon } from "../icons";
 import { IconArtwork } from "./IconArtwork";
+import { ImageArtwork } from "./ImageArtwork";
 import { TextRenderer } from "./TextRenderer";
 
 interface ElementRendererProps {
@@ -55,8 +55,8 @@ export function ElementRenderer({
       />
 
       {element.type === "image" ? (
-              <ImageArtwork element={element} />
-            ) : element.type === "icon" ? (
+        <ImageArtwork element={element} />
+      ) : element.type === "icon" ? (
         <IconArtwork iconId={element.iconId} bounds={bounds} icons={icons} />
       ) : (
         paths.map((p, i) => (

@@ -1,4 +1,3 @@
-import { ImageArtwork } from "./editor/ImageArtwork";
 import type { CSSProperties } from "react";
 import {
   getContentBounds,
@@ -15,6 +14,7 @@ import {
   type DiagramColors,
 } from "./colors";
 import { IconArtwork } from "./editor/IconArtwork";
+import { ImageArtwork } from "./editor/ImageArtwork";
 import type { DiagramIcon } from "./icons";
 
 export type {
@@ -152,7 +152,7 @@ export function DiagramRenderer({
         return (
           <g key={element.id} data-element-id={element.id}>
             {element.type === "image" ? (
-              <ImageArtwork element={element} />
+              <ImageArtwork element={element} color={resolvedColors.text} />
             ) : element.type === "icon" ? (
               <IconArtwork
                 iconId={element.iconId}

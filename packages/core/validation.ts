@@ -94,18 +94,44 @@ function isIconElement(value: Record<string, unknown>): boolean {
   );
 }
 
+/**
+ * Image sources are rendered as-is, so only allow http(s) URLs, relative or
+ * root-relative paths, and inline `data:image/…` URIs. Everything else
+ * (`javascript:`, `blob:`, protocol-relative `//host`, …) is rejected.
+ */
+function isAllowedImageSrc(src: string): boolean {
+  if (!src || /[\u0000- \\]/.test(src)) return false;
+
+  const scheme = /^[a-z][a-z0-9+.-]*:/i.exec(src)?.[0].toLowerCase();
+  if (!scheme) return !src.startsWith("//");
+  if (scheme === "data:") return /^data:image\/[a-z0-9.+-]+[;,]/i.test(src);
+  if (scheme !== "http:" && scheme !== "https:") return false;
+
+  try {
+    return new URL(src).hostname !== "";
+  } catch {
+    return false;
+  }
+}
+
+function isPositiveNumber(value: unknown): boolean {
+  return isNumber(value) && value > 0;
+}
+
 function isImageElement(value: Record<string, unknown>): boolean {
-  if (!isString(value.src) || !value.src || value.src.trim() !== value.src || /[\u0000-\u0020\\]/.test(value.src)) return false;
-  const src = value.src;
-  const scheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.exec(src)?.[0].toLowerCase();
-  if (scheme) {
-    if (scheme === "http:" || scheme === "https:") {
-      try { const url = new URL(src); if (!url.hostname) return false; } catch { return false; }
-    } else if (scheme !== "data:" || !/^data:image\/[a-z0-9.+-]+[;,]/i.test(src)) return false;
-  } else if (src.startsWith("//")) return false;
-  return hasBaseFields(value) && isNumber(value.x) && isNumber(value.y) &&
-    [value.width, value.height, value.naturalWidth, value.naturalHeight].every(v => isNumber(v) && v > 0) &&
-    isOptionalString(value.alt);
+  return (
+    value.type === "image" &&
+    hasBaseFields(value) &&
+    isString(value.src) &&
+    isAllowedImageSrc(value.src) &&
+    isNumber(value.x) &&
+    isNumber(value.y) &&
+    isPositiveNumber(value.width) &&
+    isPositiveNumber(value.height) &&
+    isPositiveNumber(value.naturalWidth) &&
+    isPositiveNumber(value.naturalHeight) &&
+    isOptionalString(value.alt)
+  );
 }
 
 function isTextElement(value: Record<string, unknown>): boolean {
@@ -147,7 +173,8 @@ function isLineElement(value: Record<string, unknown>): boolean {
   );
 }
 
-function isDiagramElement(value: unknown): value is DiagramElement {
+/** True when `value` is a structurally valid diagram element. */
+export function isDiagramElement(value: unknown): value is DiagramElement {
   if (!isRecord(value)) return false;
 
   switch (value.type) {
