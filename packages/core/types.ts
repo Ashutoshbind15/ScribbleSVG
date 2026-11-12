@@ -6,6 +6,7 @@ export type ElementType =
   | "cylinder"
   | "diamond"
   | "icon"
+  | "image"
   | "text"
   | "arrow"
   | "line";
@@ -72,6 +73,18 @@ export interface IconElement extends BaseElement {
   fontSize?: number; // default 14
 }
 
+export interface ImageElement extends BaseElement {
+  type: "image";
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  naturalWidth: number;
+  naturalHeight: number;
+  alt?: string;
+}
+
 // Standalone text element
 
 export interface TextElement extends BaseElement {
@@ -121,6 +134,7 @@ export type DiagramElement =
   | CylinderElement
   | DiamondElement
   | IconElement
+  | ImageElement
   | TextElement
   | ArrowElement
   | LineElement;

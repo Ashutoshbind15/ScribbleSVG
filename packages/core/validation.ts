@@ -94,6 +94,20 @@ function isIconElement(value: Record<string, unknown>): boolean {
   );
 }
 
+function isImageElement(value: Record<string, unknown>): boolean {
+  if (!isString(value.src) || !value.src || value.src.trim() !== value.src || /[\u0000-\u0020\\]/.test(value.src)) return false;
+  const src = value.src;
+  const scheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.exec(src)?.[0].toLowerCase();
+  if (scheme) {
+    if (scheme === "http:" || scheme === "https:") {
+      try { const url = new URL(src); if (!url.hostname) return false; } catch { return false; }
+    } else if (scheme !== "data:" || !/^data:image\/[a-z0-9.+-]+[;,]/i.test(src)) return false;
+  } else if (src.startsWith("//")) return false;
+  return hasBaseFields(value) && isNumber(value.x) && isNumber(value.y) &&
+    [value.width, value.height, value.naturalWidth, value.naturalHeight].every(v => isNumber(v) && v > 0) &&
+    isOptionalString(value.alt);
+}
+
 function isTextElement(value: Record<string, unknown>): boolean {
   return (
     value.type === "text" &&
@@ -147,6 +161,8 @@ function isDiagramElement(value: unknown): value is DiagramElement {
       return isDiamondElement(value);
     case "icon":
       return isIconElement(value);
+    case "image":
+      return isImageElement(value);
     case "text":
       return isTextElement(value);
     case "arrow":

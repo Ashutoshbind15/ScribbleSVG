@@ -7,6 +7,7 @@ export type {
   CylinderElement,
   DiamondElement,
   IconElement,
+  ImageElement,
   TextElement,
   ArrowElement,
   LineElement,

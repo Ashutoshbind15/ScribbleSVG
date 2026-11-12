@@ -51,6 +51,7 @@ export function getElementRoughPaths(element: DiagramElement): RoughPathData[] {
       return getArrowPaths(element);
     case "line":
       return getLinePaths(element);
+    case "image":
     case "icon":
     case "text":
       // Icons are rendered from consumer SVG catalogs; text is plain SVG.
