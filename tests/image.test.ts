@@ -20,3 +20,33 @@ test("images clone and translate through the clipboard", async () => {
   assert.notEqual(copy, image);
   assert.deepEqual(translateElement(copy!, 4, -2), { ...image, x: 6, y: 1 });
 });
+
+test("inserted images fit half the viewport without upscaling", async () => {
+  const { fitImageToViewport } = await import("../packages/react-utils/src/editor/image-fit");
+  const viewport = { x: 100, y: 50, zoom: 1 };
+  const screen = { width: 800, height: 600 };
+
+  // Small images keep their natural size, centred on the viewport.
+  assert.deepEqual(fitImageToViewport({ width: 200, height: 100 }, viewport, screen), {
+    x: 0,
+    y: 0,
+    width: 200,
+    height: 100,
+  });
+
+  // Large images shrink to half the visible area, keeping their ratio.
+  const wide = fitImageToViewport({ width: 4000, height: 1000 }, viewport, screen);
+  assert.equal(wide.width, 400);
+  assert.equal(wide.height, 100);
+
+  // Zooming in shrinks the visible canvas, so the image gets smaller too.
+  const zoomed = fitImageToViewport({ width: 4000, height: 1000 }, { ...viewport, zoom: 2 }, screen);
+  assert.equal(zoomed.width, 200);
+  assert.equal(zoomed.height, 50);
+});
+
+test("isDiagramElement rejects image elements with disallowed sources", async () => {
+  const { isDiagramElement } = await import("../packages/core/validation");
+  assert.equal(isDiagramElement(image), true);
+  assert.equal(isDiagramElement({ ...image, src: "blob:https://example.com/a" }), false);
+});

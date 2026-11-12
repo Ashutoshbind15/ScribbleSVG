@@ -6,9 +6,12 @@ import {
   getElementBounds,
   generateSeed,
   isConnector,
+  isDiagramElement,
   type Bounds,
   type DiagramDocument,
+  type ImageElement,
 } from "@scribblesvg/core";
+import { fitImageToViewport } from "./image-fit";
 import { useCanvasReducer } from "./useCanvasReducer";
 import { getViewBox } from "./coordinate-utils";
 import { screenToCanvas } from "./coordinate-utils";
@@ -47,7 +50,16 @@ export interface DiagramCanvasProps {
    * Valid entries become toolbar placement tools; documents only store `iconId`.
    */
   icons?: DiagramIcon[];
-  onRequestImage?: () => Promise<{ src: string; naturalWidth: number; naturalHeight: number; alt?: string } | null>;
+  /**
+   * Shows an Image toolbar button. Resolve with the image to insert (its
+   * `src` is stored as-is in the document), or `null` to cancel.
+   */
+  onRequestImage?: () => Promise<{
+    src: string;
+    naturalWidth: number;
+    naturalHeight: number;
+    alt?: string;
+  } | null>;
   /** Optional class on the editor root (e.g. for a fixed height). Requires editor.css. */
   className?: string;
 }
@@ -127,6 +139,38 @@ export function DiagramCanvas({
   viewportRef.current = state.document.viewport;
   const sizeRef = useRef(size);
   sizeRef.current = size;
+
+  /** Asks the host for an image and inserts it centred in the viewport. */
+  const insertRequestedImage = async () => {
+    if (!onRequestImage) return;
+    let result: Awaited<ReturnType<typeof onRequestImage>>;
+    try {
+      result = await onRequestImage();
+    } catch {
+      return; // The host reports its own errors.
+    }
+    if (!result) return;
+
+    const element: ImageElement = {
+      type: "image",
+      id: crypto.randomUUID(),
+      seed: generateSeed(),
+      src: result.src,
+      naturalWidth: result.naturalWidth,
+      naturalHeight: result.naturalHeight,
+      ...(result.alt ? { alt: result.alt } : {}),
+      ...fitImageToViewport(
+        { width: result.naturalWidth, height: result.naturalHeight },
+        viewportRef.current,
+        sizeRef.current,
+      ),
+    };
+    // Never let a bad host result into the document.
+    if (!isDiagramElement(element)) return;
+
+    dispatch({ type: "ADD_ELEMENTS", elements: [element], select: true });
+    dispatch({ type: "SET_TOOL", tool: "select" });
+  };
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
@@ -347,17 +391,7 @@ export function DiagramCanvas({
           activeTool={state.tool}
           activeIconId={state.activeIconId}
           catalogIcons={catalog.valid}
-          onImage={onRequestImage ? async () => {
-            try {
-              const result = await onRequestImage();
-              if (!result || !Number.isFinite(result.naturalWidth) || !Number.isFinite(result.naturalHeight) || result.naturalWidth <= 0 || result.naturalHeight <= 0) return;
-              const viewport = viewportRef.current;
-              const scale = Math.min(1, sizeRef.current.width / viewport.zoom / 2 / result.naturalWidth, sizeRef.current.height / viewport.zoom / 2 / result.naturalHeight);
-              const width = result.naturalWidth * scale, height = result.naturalHeight * scale;
-              dispatch({ type: "ADD_ELEMENTS", select: true, elements: [{ type: "image", id: crypto.randomUUID(), seed: generateSeed(), ...result, x: viewport.x - width / 2, y: viewport.y - height / 2, width, height }] });
-              dispatch({ type: "SET_TOOL", tool: "select" });
-            } catch { /* The host handles errors. */ }
-          } : undefined}
+          onImage={onRequestImage ? insertRequestedImage : undefined}
           onToolChange={(tool, activeIconId) =>
             dispatch({ type: "SET_TOOL", tool, activeIconId })
           }

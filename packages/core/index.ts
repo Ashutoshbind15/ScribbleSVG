@@ -20,7 +20,11 @@ export type {
 export { isConnector, isBindable } from "./types";
 
 // Validation
-export { parseDiagramDocument, isDiagramDocument } from "./validation";
+export {
+  parseDiagramDocument,
+  isDiagramDocument,
+  isDiagramElement,
+} from "./validation";
 
 // Geometry
 export type { Bounds, ConnectionPoint } from "./geometry";

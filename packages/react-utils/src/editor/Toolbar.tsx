@@ -5,6 +5,7 @@ import {
   CircleIcon,
   CylinderIcon,
   DiamondIcon,
+  ImageIcon,
   LineIcon,
   RectangleIcon,
   SelectIcon,
@@ -13,6 +14,7 @@ import {
 } from "./toolbarIcons";
 
 interface ToolbarProps {
+  /** When set, shows an Image button that calls it. */
   onImage?: () => void;
   activeTool: ToolType;
   activeIconId: string | null;
@@ -66,7 +68,16 @@ export function Toolbar({
         </button>
       ))}
 
-      {onImage && <button type="button" title="Image" aria-label="Image" onClick={onImage}><RectangleIcon /></button>}
+      {onImage && (
+        <button
+          type="button"
+          title="Image"
+          aria-label="Image"
+          onClick={onImage}
+        >
+          <ImageIcon />
+        </button>
+      )}
 
       {catalogIcons.map((icon) => {
         const label = icon.label ?? icon.iconId;

@@ -49,6 +49,17 @@ export function RectangleIcon({ className }: ToolbarIconProps) {
   );
 }
 
+/** Image — framed landscape */
+export function ImageIcon({ className }: ToolbarIconProps) {
+  return (
+    <IconBase className={className}>
+      <rect x="3" y="5" width="18" height="14" />
+      <polyline points="3,17 9,11 13,15 16,12 21,17" />
+      <circle cx="16" cy="9" r="1.5" fill="currentColor" stroke="none" />
+    </IconBase>
+  );
+}
+
 export function CircleIcon({ className }: ToolbarIconProps) {
   return (
     <IconBase className={className}>
