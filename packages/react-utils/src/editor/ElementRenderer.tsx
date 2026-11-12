@@ -1,3 +1,4 @@
+import { ImageArtwork } from "./ImageArtwork";
 import { useMemo } from "react";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
@@ -53,7 +54,9 @@ export function ElementRenderer({
         pointerEvents="none"
       />
 
-      {element.type === "icon" ? (
+      {element.type === "image" ? (
+              <ImageArtwork element={element} />
+            ) : element.type === "icon" ? (
         <IconArtwork iconId={element.iconId} bounds={bounds} icons={icons} />
       ) : (
         paths.map((p, i) => (

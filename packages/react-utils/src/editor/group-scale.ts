@@ -85,6 +85,7 @@ export function getGroupScalePatches(
       case "rectangle":
       case "cylinder":
       case "diamond":
+      case "image":
       case "icon": {
         const patch: Partial<DiagramElement> = {
           x: sx(el.x),
@@ -92,10 +93,10 @@ export function getGroupScalePatches(
           width: el.width * scale,
           height: el.height * scale,
         };
-        if (el.text) {
-          patch.fontSize = scaleFont(
+        if ("text" in el && el.text) {
+          Object.assign(patch, { fontSize: scaleFont(
             el.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
-          );
+          ) });
         }
         return { id: el.id, patch };
       }
@@ -106,10 +107,10 @@ export function getGroupScalePatches(
           cy: sy(el.cy),
           radius: el.radius * scale,
         };
-        if (el.text) {
-          patch.fontSize = scaleFont(
+        if ("text" in el && el.text) {
+          Object.assign(patch, { fontSize: scaleFont(
             el.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
-          );
+          ) });
         }
         return { id: el.id, patch };
       }

@@ -38,6 +38,7 @@ export function useElementDrag(
           case "rectangle":
           case "cylinder":
           case "diamond":
+          case "image":
           case "icon":
           case "text":
             startPositions.set(id, { x: el.x, y: el.y });
@@ -88,6 +89,7 @@ export function useElementDrag(
           case "rectangle":
           case "cylinder":
           case "diamond":
+          case "image":
           case "icon":
           case "text":
             updates.push({

@@ -297,7 +297,7 @@ export function useCanvasInteraction(
             id: el.id,
             patch: { fontSize, width: size.width, height: size.height },
           });
-        } else if (!isConnector(el) && el.text) {
+        } else if (!isConnector(el) && "text" in el && el.text) {
           updates.push({
             id: el.id,
             patch: {
@@ -1043,7 +1043,7 @@ export function useCanvasInteraction(
       }
 
       if (mode === "resizing") {
-        continueResize(canvasPoint);
+        continueResize(canvasPoint, e.shiftKey);
         return;
       }
 

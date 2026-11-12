@@ -192,6 +192,7 @@ export function hitTestOutline(
     case "circle":
       return Math.abs(Math.hypot(point.x - element.cx, point.y - element.cy) - element.radius) <= tolerance;
 
+    case "image":
     case "rectangle":
       return pointNearPolygon(point, rectCorners(getElementBounds(element)), tolerance);
 
@@ -248,6 +249,7 @@ export function hitTestElement(
   switch (element.type) {
     case "rectangle":
     case "cylinder":
+    case "image":
     case "icon":
     case "text":
       return pointInRect(point, getElementBounds(element));
@@ -493,6 +495,7 @@ function elementIntersectsMarquee(
     case "text":
       return boundsIntersect(getElementBounds(element), marquee);
 
+    case "image":
     case "rectangle":
       return polygonOutlineIntersectsRect(rectCorners(getElementBounds(element)), marquee);
 

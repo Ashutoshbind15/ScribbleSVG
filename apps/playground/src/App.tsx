@@ -39,6 +39,7 @@ const App = () => {
             initialDocument={document}
             onChange={setDocument}
             icons={PLAYGROUND_ICONS}
+            onRequestImage={async () => ({ src: "/sample-image.svg", naturalWidth: 480, naturalHeight: 300, alt: "Mountains at sunset" })}
           />
         </section>
         <section className="playground-pane" aria-label="Renderer">

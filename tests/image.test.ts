@@ -12,3 +12,11 @@ test("image sources and dimensions are validated", () => {
   for (const key of ["width", "height", "naturalWidth", "naturalHeight"]) for (const size of [0, -1, Infinity, NaN]) assert.equal(valid({ ...image, [key]: size }), false);
 });
 test("image bounds match its box", () => assert.deepEqual(getElementBounds(image), { x: 2, y: 3, width: 100, height: 50 }));
+
+test("images clone and translate through the clipboard", async () => {
+  const { collectCopyElements, translateElement } = await import("../packages/react-utils/src/editor/clipboard");
+  const [copy] = collectCopyElements([image], new Set([image.id]));
+  assert.deepEqual(copy, image);
+  assert.notEqual(copy, image);
+  assert.deepEqual(translateElement(copy!, 4, -2), { ...image, x: 6, y: 1 });
+});
