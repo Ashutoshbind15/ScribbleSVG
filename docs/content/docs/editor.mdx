@@ -62,3 +62,7 @@ Treat catalog SVG as trusted host input (your bundled pack or admin-curated mark
 ## Persistence
 
 Use `onChange` to keep the document in sync (e.g. save to your backend). The document is plain JSON from `@scribblesvg/core` — see [Document model](/docs/document-model).
+
+## Images
+
+Pass `onRequestImage` to `DiagramCanvas` to show the Image toolbar button. Return a promise resolving to `{ src, naturalWidth, naturalHeight, alt? }`, or `null` to cancel. The image is inserted in the viewport and selected.

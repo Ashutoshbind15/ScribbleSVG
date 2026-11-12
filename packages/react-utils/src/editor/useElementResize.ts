@@ -107,7 +107,7 @@ export function useElementResize(
   );
 
   const continueResize = useCallback(
-    (canvasPoint: { x: number; y: number }) => {
+    (canvasPoint: { x: number; y: number }, shiftKey = false) => {
       const resize = resizeRef.current;
       if (!resize) return;
 
@@ -143,12 +143,19 @@ export function useElementResize(
 
       const dx = canvasPoint.x - resize.startCanvasPoint.x;
       const dy = canvasPoint.y - resize.startCanvasPoint.y;
-      const newBounds = computeResizedBounds(
+      let newBounds = computeResizedBounds(
         resize.startBounds,
         resize.handle,
         dx,
         dy,
       );
+
+      if (resize.originalElement.type === "image" && !shiftKey && resize.handle.length === 2) {
+        const start = resize.startBounds;
+        const scale = Math.max(MIN_SIZE / start.width, MIN_SIZE / start.height, Math.max(newBounds.width / start.width, newBounds.height / start.height));
+        const width = start.width * scale, height = start.height * scale;
+        newBounds = { x: resize.handle.includes("w") ? start.x + start.width - width : start.x, y: resize.handle.includes("n") ? start.y + start.height - height : start.y, width, height };
+      }
 
       const patch = boundsToElementPatch(
         resize.originalElement,
@@ -256,6 +263,7 @@ function boundsToElementPatch(
     case "rectangle":
     case "cylinder":
     case "diamond":
+    case "image":
     case "icon": {
       const patch: Partial<DiagramElement> = {
         x: bounds.x,
@@ -263,12 +271,12 @@ function boundsToElementPatch(
         width: bounds.width,
         height: bounds.height,
       };
-      if (original.text) {
-        patch.fontSize = scaleFontSizeForResize(
+      if ("text" in original && original.text) {
+        Object.assign(patch, { fontSize: scaleFontSizeForResize(
           original.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
           bounds,
           resizeStartBounds,
-        );
+        ) });
       }
       return patch;
     }
@@ -284,12 +292,12 @@ function boundsToElementPatch(
         cy: bounds.y + bounds.height / 2,
         radius,
       };
-      if (original.text) {
-        patch.fontSize = scaleFontSizeForResize(
+      if ("text" in original && original.text) {
+        Object.assign(patch, { fontSize: scaleFontSizeForResize(
           original.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE,
           bounds,
           resizeStartBounds,
-        );
+        ) });
       }
       return patch;
     }

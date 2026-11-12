@@ -1,3 +1,4 @@
+import { ImageArtwork } from "./editor/ImageArtwork";
 import type { CSSProperties } from "react";
 import {
   getContentBounds,
@@ -150,7 +151,9 @@ export function DiagramRenderer({
 
         return (
           <g key={element.id} data-element-id={element.id}>
-            {element.type === "icon" ? (
+            {element.type === "image" ? (
+              <ImageArtwork element={element} />
+            ) : element.type === "icon" ? (
               <IconArtwork
                 iconId={element.iconId}
                 bounds={elementBounds}

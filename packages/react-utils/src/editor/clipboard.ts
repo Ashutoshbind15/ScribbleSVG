@@ -90,6 +90,7 @@ export function translateElement<T extends DiagramElement>(
     case "rectangle":
     case "cylinder":
     case "diamond":
+    case "image":
     case "icon":
     case "text":
       return { ...el, x: el.x + dx, y: el.y + dy };

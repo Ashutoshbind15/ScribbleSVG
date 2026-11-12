@@ -13,6 +13,7 @@ import {
 } from "./toolbarIcons";
 
 interface ToolbarProps {
+  onImage?: () => void;
   activeTool: ToolType;
   activeIconId: string | null;
   /** Valid catalog icons to expose as placement tools (SVG previews). */
@@ -40,6 +41,7 @@ const BUILTIN_TOOLS: {
  * Catalog icons appear as SVG-preview buttons after the built-in shape tools.
  */
 export function Toolbar({
+  onImage,
   activeTool,
   activeIconId,
   catalogIcons = [],
@@ -63,6 +65,8 @@ export function Toolbar({
           <Icon />
         </button>
       ))}
+
+      {onImage && <button type="button" title="Image" aria-label="Image" onClick={onImage}><RectangleIcon /></button>}
 
       {catalogIcons.map((icon) => {
         const label = icon.label ?? icon.iconId;

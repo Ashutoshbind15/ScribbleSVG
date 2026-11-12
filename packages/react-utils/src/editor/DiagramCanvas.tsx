@@ -4,6 +4,7 @@ import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
+  generateSeed,
   isConnector,
   type Bounds,
   type DiagramDocument,
@@ -46,6 +47,7 @@ export interface DiagramCanvasProps {
    * Valid entries become toolbar placement tools; documents only store `iconId`.
    */
   icons?: DiagramIcon[];
+  onRequestImage?: () => Promise<{ src: string; naturalWidth: number; naturalHeight: number; alt?: string } | null>;
   /** Optional class on the editor root (e.g. for a fixed height). Requires editor.css. */
   className?: string;
 }
@@ -58,6 +60,7 @@ export function DiagramCanvas({
   initialDocument,
   onChange,
   icons,
+  onRequestImage,
   className,
 }: DiagramCanvasProps) {
   const [state, dispatch] = useCanvasReducer(initialDocument);
@@ -307,7 +310,7 @@ export function DiagramCanvas({
   } else if (
     singleSelectedElement &&
     !isConnector(singleSelectedElement) &&
-    singleSelectedElement.text
+    "text" in singleSelectedElement && singleSelectedElement.text
   ) {
     const element = singleSelectedElement;
     const fontSize = element.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE;
@@ -344,6 +347,17 @@ export function DiagramCanvas({
           activeTool={state.tool}
           activeIconId={state.activeIconId}
           catalogIcons={catalog.valid}
+          onImage={onRequestImage ? async () => {
+            try {
+              const result = await onRequestImage();
+              if (!result || !Number.isFinite(result.naturalWidth) || !Number.isFinite(result.naturalHeight) || result.naturalWidth <= 0 || result.naturalHeight <= 0) return;
+              const viewport = viewportRef.current;
+              const scale = Math.min(1, sizeRef.current.width / viewport.zoom / 2 / result.naturalWidth, sizeRef.current.height / viewport.zoom / 2 / result.naturalHeight);
+              const width = result.naturalWidth * scale, height = result.naturalHeight * scale;
+              dispatch({ type: "ADD_ELEMENTS", select: true, elements: [{ type: "image", id: crypto.randomUUID(), seed: generateSeed(), ...result, x: viewport.x - width / 2, y: viewport.y - height / 2, width, height }] });
+              dispatch({ type: "SET_TOOL", tool: "select" });
+            } catch { /* The host handles errors. */ }
+          } : undefined}
           onToolChange={(tool, activeIconId) =>
             dispatch({ type: "SET_TOOL", tool, activeIconId })
           }
