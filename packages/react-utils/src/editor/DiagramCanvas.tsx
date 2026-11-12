@@ -7,6 +7,7 @@ import {
   generateSeed,
   isConnector,
   isDiagramElement,
+  isLabeledShape,
   type Bounds,
   type DiagramDocument,
   type ImageElement,
@@ -353,8 +354,8 @@ export function DiagramCanvas({
     );
   } else if (
     singleSelectedElement &&
-    !isConnector(singleSelectedElement) &&
-    "text" in singleSelectedElement && singleSelectedElement.text
+    isLabeledShape(singleSelectedElement) &&
+    singleSelectedElement.text
   ) {
     const element = singleSelectedElement;
     const fontSize = element.fontSize ?? DEFAULT_SHAPE_LABEL_FONT_SIZE;

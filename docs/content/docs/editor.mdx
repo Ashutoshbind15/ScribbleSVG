@@ -66,3 +66,13 @@ Use `onChange` to keep the document in sync (e.g. save to your backend). The doc
 ## Images
 
 Pass `onRequestImage` to `DiagramCanvas` to show the Image toolbar button. Return a promise resolving to `{ src, naturalWidth, naturalHeight, alt? }`, or `null` to cancel. The image is inserted in the viewport and selected.
+
+`src` is stored in the document as-is, so only these forms are accepted:
+
+- absolute `http:` or `https:` URLs
+- relative or root-relative paths (`photo.png`, `/uploads/photo.png`)
+- inline `data:image/…` URIs
+
+Anything else, such as `blob:` or `javascript:` URLs, is ignored and nothing is inserted. For a local file, upload it and return its URL, or read it as a `data:` URI. Sources containing tabs, newlines or leading/trailing spaces are also rejected, so remove line breaks from base64 data first.
+
+Dragging an image's corner handle keeps its aspect ratio. Hold **Shift** to stretch it freely. The edge handles always stretch one side.

@@ -4,7 +4,7 @@ import {
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
   getElementRoughPaths,
-  isConnector,
+  isLabeledShape,
   type DiagramElement,
 } from "@scribblesvg/core";
 import type { DiagramIcon } from "../icons";
@@ -84,9 +84,7 @@ export function ElementRenderer({
 
       {/* Shape labels — centered multi-line text */}
       {!isEditingText &&
-        element.type !== "text" &&
-        !isConnector(element) &&
-        "text" in element &&
+        isLabeledShape(element) &&
         element.text && (
           <TextRenderer
             mode="shape-label"

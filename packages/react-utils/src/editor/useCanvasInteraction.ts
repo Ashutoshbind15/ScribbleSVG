@@ -5,6 +5,7 @@ import {
   generateSeed,
   getElementBounds,
   isConnector,
+  isLabeledShape,
   type Bounds,
   type CircleElement,
   type CylinderElement,
@@ -297,7 +298,7 @@ export function useCanvasInteraction(
             id: el.id,
             patch: { fontSize, width: size.width, height: size.height },
           });
-        } else if (!isConnector(el) && "text" in el && el.text) {
+        } else if (isLabeledShape(el) && el.text) {
           updates.push({
             id: el.id,
             patch: {

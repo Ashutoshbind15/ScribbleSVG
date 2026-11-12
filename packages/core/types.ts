@@ -152,6 +152,28 @@ export function isBindable(el: DiagramElement): el is BindableElement {
   return !isConnector(el);
 }
 
+/** Shapes that can carry a centred text label (`text` / `fontSize`). */
+export type LabeledShapeElement =
+  | RectangleElement
+  | CircleElement
+  | CylinderElement
+  | DiamondElement
+  | IconElement;
+
+/** True for shapes that can carry a label; false for text, images and connectors. */
+export function isLabeledShape(el: DiagramElement): el is LabeledShapeElement {
+  switch (el.type) {
+    case "rectangle":
+    case "circle":
+    case "cylinder":
+    case "diamond":
+    case "icon":
+      return true;
+    default:
+      return false;
+  }
+}
+
 // Viewport
 
 export interface Viewport {

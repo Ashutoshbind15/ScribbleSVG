@@ -26,6 +26,14 @@ const PLAYGROUND_ICONS: DiagramIcon[] = [
   { iconId: "broken", svg: "" },
 ];
 
+/** Stands in for a real file picker or upload flow. */
+const requestSampleImage = async () => ({
+  src: "/sample-image.svg",
+  naturalWidth: 480,
+  naturalHeight: 300,
+  alt: "Mountains at sunset",
+});
+
 const App = () => {
   const [document, setDocument] = useState<DiagramDocument>(EMPTY_DOCUMENT);
 
@@ -39,7 +47,7 @@ const App = () => {
             initialDocument={document}
             onChange={setDocument}
             icons={PLAYGROUND_ICONS}
-            onRequestImage={async () => ({ src: "/sample-image.svg", naturalWidth: 480, naturalHeight: 300, alt: "Mountains at sunset" })}
+            onRequestImage={requestSampleImage}
           />
         </section>
         <section className="playground-pane" aria-label="Renderer">
