@@ -12,7 +12,7 @@ import {
   type DiagramDocument,
   type ImageElement,
 } from "@scribblesvg/core";
-import { fitImageToViewport } from "./image-fit";
+import { fitImageToViewport, measureImage } from "./image-fit";
 import { useCanvasReducer } from "./useCanvasReducer";
 import { getViewBox } from "./coordinate-utils";
 import { screenToCanvas } from "./coordinate-utils";
@@ -78,11 +78,6 @@ export function DiagramCanvas({
   const [state, dispatch] = useCanvasReducer(initialDocument);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const mountedRef = useRef(false);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
 
   const catalog = useMemo(() => partitionIconCatalog(icons), [icons]);
 
@@ -145,44 +140,30 @@ export function DiagramCanvas({
   const sizeRef = useRef(size);
   sizeRef.current = size;
 
-  /** Asks the host for an image and inserts it centred in the viewport. */
+  /**
+   * Asks the host for an image and inserts it centred in the viewport.
+   * Cancelled, unloadable or invalid images are skipped; the host reports its own errors.
+   */
   const insertRequestedImage = async () => {
-    if (!onRequestImage) return;
-    let result: Awaited<ReturnType<typeof onRequestImage>>;
-    try {
-      result = await onRequestImage();
-    } catch {
-      return; // The host reports its own errors.
-    }
-    if (!result || !mountedRef.current) return;
-    const img = new Image();
-    try {
-      img.src = result.src;
-      await img.decode();
-    } catch {
-      return;
-    }
-    if (!mountedRef.current || !(img.naturalWidth > 0) || !(img.naturalHeight > 0)) return;
+    const result = await onRequestImage?.().catch(() => null);
+    const size = result && (await measureImage(result.src));
+    if (!result || !size) return;
 
     const element: ImageElement = {
       type: "image",
       id: crypto.randomUUID(),
       seed: generateSeed(),
       src: result.src,
-      naturalWidth: img.naturalWidth,
-      naturalHeight: img.naturalHeight,
+      naturalWidth: size.width,
+      naturalHeight: size.height,
       ...(result.alt ? { alt: result.alt } : {}),
-      ...fitImageToViewport(
-        { width: img.naturalWidth, height: img.naturalHeight },
-        viewportRef.current,
-        sizeRef.current,
-      ),
+      ...fitImageToViewport(size, viewportRef.current, sizeRef.current),
     };
     // Never let a bad host result into the document.
-    if (!isDiagramElement(element)) return;
-
-    dispatch({ type: "ADD_ELEMENTS", elements: [element], select: true });
-    dispatch({ type: "SET_TOOL", tool: "select" });
+    if (isDiagramElement(element)) {
+      dispatch({ type: "ADD_ELEMENTS", elements: [element], select: true });
+      dispatch({ type: "SET_TOOL", tool: "select" });
+    }
   };
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
