@@ -28,3 +28,21 @@ export function fitImageToViewport(
     height,
   };
 }
+
+/**
+ * Loads `src` and resolves with its natural size, or `null` when it fails to
+ * load or has no intrinsic size (e.g. an SVG without width/height).
+ */
+export async function measureImage(
+  src: string,
+): Promise<{ width: number; height: number } | null> {
+  const img = new Image();
+  img.src = src;
+  try {
+    await img.decode();
+  } catch {
+    return null;
+  }
+  const { naturalWidth: width, naturalHeight: height } = img;
+  return width > 0 && height > 0 ? { width, height } : null;
+}

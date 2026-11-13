@@ -65,7 +65,7 @@ Use `onChange` to keep the document in sync (e.g. save to your backend). The doc
 
 ## Images
 
-Pass `onRequestImage` to `DiagramCanvas` to show the Image toolbar button. Return a promise resolving to `{ src, naturalWidth, naturalHeight, alt? }`, or `null` to cancel. The image is inserted in the viewport and selected.
+Pass `onRequestImage` to `DiagramCanvas` to show the Image toolbar button. Return a promise resolving to `{ src, alt? }`, or `null` to cancel. The editor loads and measures the image, then inserts it in the viewport and selects it.
 
 `src` is stored in the document as-is, so only these forms are accepted:
 

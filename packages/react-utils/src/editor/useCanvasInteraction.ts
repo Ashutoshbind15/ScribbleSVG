@@ -73,6 +73,97 @@ function isConnectorTool(tool: ToolType): tool is "arrow" | "line" {
   return tool === "arrow" || tool === "line";
 }
 
+type Point = { x: number; y: number };
+type ShapeTool = "rectangle" | "circle" | "cylinder" | "diamond";
+
+/** A new shape at its default size, placed at `point`. */
+function createShapeElement(
+  tool: ShapeTool,
+  point: Point,
+  id: string,
+  seed: number,
+): DiagramElement {
+  const box = { id, seed, x: point.x, y: point.y };
+  switch (tool) {
+    case "rectangle":
+      return { ...box, type: "rectangle", ...DEFAULT_RECT_SIZE } satisfies RectangleElement;
+    case "diamond":
+      return { ...box, type: "diamond", ...DEFAULT_DIAMOND_SIZE } satisfies DiamondElement;
+    case "cylinder":
+      return { ...box, type: "cylinder", ...DEFAULT_CYLINDER_SIZE } satisfies CylinderElement;
+    case "circle":
+      return {
+        id,
+        seed,
+        type: "circle",
+        cx: point.x,
+        cy: point.y,
+        radius: DEFAULT_CIRCLE_RADIUS,
+      } satisfies CircleElement;
+  }
+}
+
+/** A new icon at its catalog size (or the default), placed at `point`. */
+function createIconElement(
+  icons: DiagramIcon[] | undefined,
+  iconId: string,
+  point: Point,
+  id: string,
+  seed: number,
+): IconElement {
+  const icon = resolveDiagramIcon(icons, iconId);
+  return {
+    id,
+    type: "icon",
+    seed,
+    iconId,
+    x: point.x,
+    y: point.y,
+    width: icon?.defaultWidth ?? DEFAULT_ICON_SIZE.width,
+    height: icon?.defaultHeight ?? DEFAULT_ICON_SIZE.height,
+  };
+}
+
+/** Size patch for an element being click-dragged out from `creation.startPoint`. */
+function creationPatch(creation: CreationState, point: Point): Partial<DiagramElement> {
+  const start = creation.startPoint;
+  const dx = point.x - start.x;
+  const dy = point.y - start.y;
+  if (creation.type === "circle") {
+    return { cx: start.x, cy: start.y, radius: Math.max(10, Math.hypot(dx, dy)) };
+  }
+  return {
+    x: Math.min(start.x, point.x),
+    y: Math.min(start.y, point.y),
+    width: Math.max(20, Math.abs(dx)),
+    height: Math.max(20, Math.abs(dy)),
+  };
+}
+
+/**
+ * The resize handle under `point` for the current selection: the corner
+ * handles of a multi-selection's group box, or a single element's box handles.
+ * Connectors and standalone text (which has its own size grip) have none.
+ */
+function hitTestSelectionHandle(
+  point: Point,
+  elements: DiagramElement[],
+  selectedIds: Set<string>,
+  zoom: number,
+): HandlePosition | null {
+  const handleSize = HANDLE_SIZE / zoom;
+  if (selectedIds.size > 1) {
+    const groupBounds = getGroupSelectionBounds(elements, selectedIds);
+    return groupBounds && hitTestResizeHandle(point, groupBounds, handleSize, CORNER_HANDLES);
+  }
+  const [selectedId] = selectedIds;
+  const selected = elements.find((el) => el.id === selectedId);
+  const hasBoxHandles = selected && !isConnector(selected) && selected.type !== "text";
+  return hasBoxHandles
+    ? hitTestResizeHandle(point, getElementBounds(selected), handleSize)
+    : null;
+}
+
 /**
  * What the current pointer interaction is.
  */
@@ -698,6 +789,108 @@ export function useCanvasInteraction(
     ],
   );
 
+  /** Adds `element` and lets the user click-drag out its size. */
+  const beginCreation = useCallback(
+    (
+      e: React.PointerEvent<SVGSVGElement>,
+      svg: SVGSVGElement,
+      type: CreationState["type"],
+      element: DiagramElement,
+      point: Point,
+    ) => {
+      e.preventDefault();
+      creationRef.current = {
+        type,
+        startPoint: point,
+        elementId: element.id,
+        seed: element.seed,
+      };
+      setMode("creating");
+      dispatch({ type: "BEGIN_HISTORY" });
+      dispatch({ type: "ADD_ELEMENT", element });
+      dispatch({ type: "SET_TOOL", tool: "select" });
+      dispatch({ type: "SET_SELECTION", ids: [element.id] });
+      svg.setPointerCapture(e.pointerId);
+    },
+    [dispatch],
+  );
+
+  /** Starts resizing the selection from `handle`; false if it can't be resized. */
+  const startSelectionResize = useCallback(
+    (handle: HandlePosition, point: Point) => {
+      if (selectedIds.size > 1) return startGroupScale(selectedIds, handle, point);
+      const [selectedId] = selectedIds;
+      startResize(selectedId, handle, point);
+      return true;
+    },
+    [selectedIds, startGroupScale, startResize],
+  );
+
+  /** Select tool press: resize from a handle, drag what's under the pointer, or start a marquee. */
+  const pressWithSelectTool = useCallback(
+    (
+      e: React.PointerEvent<SVGSVGElement>,
+      svg: SVGSVGElement,
+      point: Point,
+      targets: DiagramElement[],
+    ) => {
+      pendingEditRef.current = null;
+      const beginGesture = (next: InteractionMode) => {
+        setMode(next);
+        svg.setPointerCapture(e.pointerId);
+      };
+
+      // A group that can't scale falls through to a normal press
+      const handle = hitTestSelectionHandle(point, targets, selectedIds, viewport.zoom);
+      const resizing = handle !== null && startSelectionResize(handle, point);
+      const hitElement = resizing
+        ? null
+        : hitTestSelection(point, targets, viewport.zoom, selectedIds);
+
+      if (resizing) {
+        e.preventDefault();
+        setResizeHandle(handle);
+        beginGesture("resizing");
+      } else if (hitElement) {
+        e.stopPropagation();
+        const alreadySelected = selectedIds.has(hitElement.id);
+        if (e.shiftKey) {
+          const next = new Set(selectedIds);
+          if (alreadySelected) next.delete(hitElement.id);
+          else next.add(hitElement.id);
+          dispatch({ type: "SET_SELECTION", ids: Array.from(next) });
+        } else if (!alreadySelected) {
+          dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
+        } else if (!editingTarget && selectedIds.size === 1) {
+          // Clicking the sole selection again edits its text (on release)
+          pendingEditRef.current = {
+            elementId: hitElement.id,
+            screenStart: { x: e.clientX, y: e.clientY },
+          };
+        }
+        beginGesture("dragging");
+        startDrag(alreadySelected ? Array.from(selectedIds) : [hitElement.id], point);
+      } else if (!e.shiftKey && hitTestGroupSelection(point, targets, selectedIds)) {
+        // Empty space inside a multi-selection's group box drags the group
+        e.stopPropagation();
+        beginGesture("dragging");
+        startDrag(Array.from(selectedIds), point);
+      } else {
+        // Empty canvas → box selection (click without drag clears)
+        e.preventDefault();
+        marqueeRef.current = {
+          startPoint: point,
+          currentPoint: point,
+          screenStart: { x: e.clientX, y: e.clientY },
+          additive: e.shiftKey,
+        };
+        setMarqueeBounds(boundsFromPoints(point, point));
+        beginGesture("marqueeing");
+      }
+    },
+    [selectedIds, viewport.zoom, editingTarget, dispatch, startSelectionResize, startDrag],
+  );
+
   // ── Pointer down on SVG ──
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
@@ -716,9 +909,8 @@ export function useCanvasInteraction(
       }
       const canvasPoint = getCanvasPoint(e);
 
-      // Middle-click or space+left-click → pan
-      const shouldPan = e.button === 1 || (e.button === 0 && spaceHeld);
-      if (shouldPan) {
+      // Middle-click or space+left-click → pan, whatever the tool
+      if (e.button === 1 || (e.button === 0 && spaceHeld)) {
         e.preventDefault();
         setMode("panning");
         setPanStart({ x: e.clientX, y: e.clientY });
@@ -726,249 +918,52 @@ export function useCanvasInteraction(
         svg.setPointerCapture(e.pointerId);
         return;
       }
+      if (e.button !== 0) return; // tools act on left-click only
 
-      if (e.button !== 0) return; // only left-click below
+      switch (tool) {
+        case "arrow":
+        case "line":
+          handleArrowClick(tool, canvasPoint, HANDLE_SIZE / viewport.zoom, e.shiftKey);
+          break;
 
-      // Connector tools (arrow / line)
-      if (isConnectorTool(tool)) {
-        const snapThreshold = HANDLE_SIZE / viewport.zoom;
-        handleArrowClick(tool, canvasPoint, snapThreshold, e.shiftKey);
-        return;
-      }
-
-      if (tool === "text") {
-        e.preventDefault();
-
-        const hitElement = hitTestTextTarget(canvasPoint, targets, viewport.zoom);
-        if (hitElement) {
-          dispatch({ type: "SET_TOOL", tool: "select" });
-          dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
-          openTextEditor(hitElement);
-          return;
-        }
-
-        createTextAt(canvasPoint);
-        return;
-      }
-
-      // Creation tools: rectangle, circle, cylinder, diamond, icon (requires activeIconId)
-      if (
-        tool === "rectangle" ||
-        tool === "circle" ||
-        tool === "cylinder" ||
-        tool === "diamond"
-      ) {
-        e.preventDefault();
-        const elementId = crypto.randomUUID();
-        const seed = generateSeed();
-
-        let element: DiagramElement;
-        if (tool === "rectangle") {
-          element = {
-            id: elementId,
-            type: "rectangle",
-            seed,
-            x: canvasPoint.x,
-            y: canvasPoint.y,
-            width: DEFAULT_RECT_SIZE.width,
-            height: DEFAULT_RECT_SIZE.height,
-          } satisfies RectangleElement;
-        } else if (tool === "circle") {
-          element = {
-            id: elementId,
-            type: "circle",
-            seed,
-            cx: canvasPoint.x,
-            cy: canvasPoint.y,
-            radius: DEFAULT_CIRCLE_RADIUS,
-          } satisfies CircleElement;
-        } else if (tool === "diamond") {
-          element = {
-            id: elementId,
-            type: "diamond",
-            seed,
-            x: canvasPoint.x,
-            y: canvasPoint.y,
-            width: DEFAULT_DIAMOND_SIZE.width,
-            height: DEFAULT_DIAMOND_SIZE.height,
-          } satisfies DiamondElement;
-        } else {
-          element = {
-            id: elementId,
-            type: "cylinder",
-            seed,
-            x: canvasPoint.x,
-            y: canvasPoint.y,
-            width: DEFAULT_CYLINDER_SIZE.width,
-            height: DEFAULT_CYLINDER_SIZE.height,
-          } satisfies CylinderElement;
-        }
-
-        creationRef.current = {
-          type: tool,
-          startPoint: canvasPoint,
-          elementId,
-          seed,
-        };
-        setMode("creating");
-        dispatch({ type: "BEGIN_HISTORY" });
-        dispatch({ type: "ADD_ELEMENT", element });
-        dispatch({ type: "SET_TOOL", tool: "select" });
-        dispatch({ type: "SET_SELECTION", ids: [elementId] });
-        svg.setPointerCapture(e.pointerId);
-        return;
-      }
-
-      if (tool === "icon" && activeIconId) {
-        e.preventDefault();
-        const elementId = crypto.randomUUID();
-        const seed = generateSeed();
-        const catalog = resolveDiagramIcon(icons, activeIconId);
-        const element = {
-          id: elementId,
-          type: "icon",
-          seed,
-          iconId: activeIconId,
-          x: canvasPoint.x,
-          y: canvasPoint.y,
-          width: catalog?.defaultWidth ?? DEFAULT_ICON_SIZE.width,
-          height: catalog?.defaultHeight ?? DEFAULT_ICON_SIZE.height,
-        } satisfies IconElement;
-
-        creationRef.current = {
-          type: "icon",
-          startPoint: canvasPoint,
-          elementId,
-          seed,
-        };
-        setMode("creating");
-        dispatch({ type: "BEGIN_HISTORY" });
-        dispatch({ type: "ADD_ELEMENT", element });
-        dispatch({ type: "SET_TOOL", tool: "select" });
-        dispatch({ type: "SET_SELECTION", ids: [elementId] });
-        svg.setPointerCapture(e.pointerId);
-        return;
-      }
-
-      // Select tool: click-select, drag-move, or marquee on empty canvas
-      if (tool === "select") {
-        pendingEditRef.current = null;
-
-        // Check if pointer is on a resize handle of a selected element
-        if (selectedIds.size === 1) {
-          const selectedId = Array.from(selectedIds)[0];
-          const selectedEl = targets.find((el) => el.id === selectedId);
-          // Standalone text has no box handles; its size grip handles itself
-          if (
-            selectedEl &&
-            !isConnector(selectedEl) &&
-            selectedEl.type !== "text"
-          ) {
-            const bounds = getElementBounds(selectedEl);
-            // Adjust handle size based on zoom
-            const handleSizeCanvas = HANDLE_SIZE / viewport.zoom;
-            const handle = hitTestResizeHandle(
-              canvasPoint,
-              bounds,
-              handleSizeCanvas,
-            );
-            if (handle) {
-              e.preventDefault();
-              setMode("resizing");
-              setResizeHandle(handle);
-              startResize(selectedId, handle, canvasPoint);
-              svg.setPointerCapture(e.pointerId);
-              return;
-            }
-          }
-        }
-
-        // Corner handles of a multi-selection's group box scale the group
-        if (selectedIds.size > 1) {
-          const groupBounds = getGroupSelectionBounds(targets, selectedIds);
-          const handle =
-            groupBounds &&
-            hitTestResizeHandle(
-              canvasPoint,
-              groupBounds,
-              HANDLE_SIZE / viewport.zoom,
-              CORNER_HANDLES,
-            );
-          if (handle && startGroupScale(selectedIds, handle, canvasPoint)) {
-            e.preventDefault();
-            setMode("resizing");
-            setResizeHandle(handle);
-            svg.setPointerCapture(e.pointerId);
-            return;
-          }
-        }
-
-        // Hit test elements
-        const hitElement = hitTestSelection(canvasPoint, targets, viewport.zoom, selectedIds);
-
-        if (hitElement) {
-          e.stopPropagation();
-
-          if (e.shiftKey) {
-            // Toggle selection
-            const next = new Set(selectedIds);
-            if (next.has(hitElement.id)) {
-              next.delete(hitElement.id);
-            } else {
-              next.add(hitElement.id);
-            }
-            dispatch({
-              type: "SET_SELECTION",
-              ids: Array.from(next),
-            });
-          } else {
-            // Clicking the sole selection again edits its text (on release)
-            if (
-              !editingTarget &&
-              selectedIds.size === 1 &&
-              selectedIds.has(hitElement.id)
-            ) {
-              pendingEditRef.current = {
-                elementId: hitElement.id,
-                screenStart: { x: e.clientX, y: e.clientY },
-              };
-            }
-            // If not already selected, select it
-            if (!selectedIds.has(hitElement.id)) {
-              dispatch({
-                type: "SET_SELECTION",
-                ids: [hitElement.id],
-              });
-            }
-          }
-
-          // Start drag for the selected elements
-          const dragIds = selectedIds.has(hitElement.id)
-            ? Array.from(selectedIds)
-            : [hitElement.id];
-          setMode("dragging");
-          startDrag(dragIds, canvasPoint);
-          svg.setPointerCapture(e.pointerId);
-        } else if (!e.shiftKey && hitTestGroupSelection(canvasPoint, targets, selectedIds)) {
-          // Empty space inside a multi-selection's group box drags the group
-          e.stopPropagation();
-          setMode("dragging");
-          startDrag(Array.from(selectedIds), canvasPoint);
-          svg.setPointerCapture(e.pointerId);
-        } else {
-          // Empty canvas → box selection (click without drag clears)
+        case "text": {
           e.preventDefault();
-          const marquee: MarqueeState = {
-            startPoint: canvasPoint,
-            currentPoint: canvasPoint,
-            screenStart: { x: e.clientX, y: e.clientY },
-            additive: e.shiftKey,
-          };
-          marqueeRef.current = marquee;
-          setMarqueeBounds(boundsFromPoints(canvasPoint, canvasPoint));
-          setMode("marqueeing");
-          svg.setPointerCapture(e.pointerId);
+          const hitElement = hitTestTextTarget(canvasPoint, targets, viewport.zoom);
+          if (hitElement) {
+            dispatch({ type: "SET_TOOL", tool: "select" });
+            dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
+            openTextEditor(hitElement);
+          } else {
+            createTextAt(canvasPoint);
+          }
+          break;
         }
+
+        case "rectangle":
+        case "circle":
+        case "cylinder":
+        case "diamond": {
+          const element = createShapeElement(tool, canvasPoint, crypto.randomUUID(), generateSeed());
+          beginCreation(e, svg, tool, element, canvasPoint);
+          break;
+        }
+
+        case "icon":
+          if (activeIconId) {
+            const element = createIconElement(
+              icons,
+              activeIconId,
+              canvasPoint,
+              crypto.randomUUID(),
+              generateSeed(),
+            );
+            beginCreation(e, svg, "icon", element, canvasPoint);
+          }
+          break;
+
+        case "select":
+          pressWithSelectTool(e, svg, canvasPoint, targets);
+          break;
       }
     },
     [
@@ -977,19 +972,17 @@ export function useCanvasInteraction(
       spaceHeld,
       viewport,
       tool,
-      selectedIds,
       elements,
       dispatch,
       handleArrowClick,
-      startDrag,
-      startResize,
-      startGroupScale,
       editingTarget,
       openTextEditor,
       createTextAt,
       commitTextEditing,
       activeIconId,
       icons,
+      beginCreation,
+      pressWithSelectTool,
     ],
   );
 
@@ -1019,100 +1012,72 @@ export function useCanvasInteraction(
     [svgRef, viewport, containerSize, tool, createTextAt, editingTarget],
   );
 
-  // ── Pointer move on SVG ──
+  // ── Pointer move on SVG: continue the active gesture, or update hover feedback ──
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       const canvasPoint = getCanvasPoint(e);
 
-      if (mode === "panning" && panStart && panViewportStart) {
-        const dx = (e.clientX - panStart.x) / viewport.zoom;
-        const dy = (e.clientY - panStart.y) / viewport.zoom;
-        dispatch({
-          type: "SET_VIEWPORT",
-          viewport: {
-            ...viewport,
-            x: panViewportStart.x - dx,
-            y: panViewportStart.y - dy,
-          },
-        });
-        return;
-      }
+      switch (mode) {
+        case "panning":
+          if (panStart && panViewportStart) {
+            dispatch({
+              type: "SET_VIEWPORT",
+              viewport: {
+                ...viewport,
+                x: panViewportStart.x - (e.clientX - panStart.x) / viewport.zoom,
+                y: panViewportStart.y - (e.clientY - panStart.y) / viewport.zoom,
+              },
+            });
+          }
+          break;
 
-      if (mode === "dragging") {
-        continueDrag(canvasPoint);
-        return;
-      }
+        case "dragging":
+          continueDrag(canvasPoint);
+          break;
 
-      if (mode === "resizing") {
-        continueResize(canvasPoint, e.shiftKey);
-        return;
-      }
+        case "resizing":
+          continueResize(canvasPoint, e.shiftKey);
+          break;
 
-      if (mode === "creating" && creationRef.current) {
-        const creation = creationRef.current;
-        const dx = canvasPoint.x - creation.startPoint.x;
-        const dy = canvasPoint.y - creation.startPoint.y;
-
-        // Update element size based on drag
-        let patch: Partial<DiagramElement> = {};
-        if (
-          creation.type === "rectangle" ||
-          creation.type === "cylinder" ||
-          creation.type === "diamond" ||
-          creation.type === "icon"
-        ) {
-          const x = dx >= 0 ? creation.startPoint.x : canvasPoint.x;
-          const y = dy >= 0 ? creation.startPoint.y : canvasPoint.y;
-          const width = Math.max(20, Math.abs(dx));
-          const height = Math.max(20, Math.abs(dy));
-          patch = { x, y, width, height };
-        } else if (creation.type === "circle") {
-          const radius = Math.max(10, Math.sqrt(dx * dx + dy * dy));
-          patch = {
-            cx: creation.startPoint.x,
-            cy: creation.startPoint.y,
-            radius,
-          };
+        case "creating": {
+          const creation = creationRef.current;
+          if (creation) {
+            dispatch({
+              type: "UPDATE_ELEMENT",
+              id: creation.elementId,
+              patch: creationPatch(creation, canvasPoint),
+            });
+          }
+          break;
         }
 
-        dispatch({
-          type: "UPDATE_ELEMENT",
-          id: creation.elementId,
-          patch,
-        });
-        return;
-      }
-
-      if (mode === "marqueeing" && marqueeRef.current) {
-        marqueeRef.current = {
-          ...marqueeRef.current,
-          currentPoint: canvasPoint,
-        };
-        setMarqueeBounds(
-          boundsFromPoints(marqueeRef.current.startPoint, canvasPoint),
-        );
-        return;
-      }
-
-      if (tool === "select") {
-        setHoveringSelectable(
-          hitTestSelection(canvasPoint, elements, viewport.zoom, selectedIds) !== null ||
-            hitTestGroupSelection(canvasPoint, elements, selectedIds),
-        );
-        return;
-      }
-
-      // Connector tool: track hovered connection point and preview snap
-      if (isConnectorTool(tool)) {
-        const snapThreshold = HANDLE_SIZE / viewport.zoom;
-        lastConnectorPointRef.current = canvasPoint;
-        setHoveredConnectionPoint(
-          hitTestConnectionPoint(canvasPoint, elements, snapThreshold),
-        );
-        if (arrowStart) {
-          updatePreview(tool, canvasPoint, snapThreshold, e.shiftKey);
+        case "marqueeing": {
+          const marquee = marqueeRef.current;
+          if (marquee) {
+            marqueeRef.current = { ...marquee, currentPoint: canvasPoint };
+            setMarqueeBounds(boundsFromPoints(marquee.startPoint, canvasPoint));
+          }
+          break;
         }
-        return;
+
+        case "none":
+          if (tool === "select") {
+            setHoveringSelectable(
+              hitTestSelection(canvasPoint, elements, viewport.zoom, selectedIds) !== null ||
+                hitTestGroupSelection(canvasPoint, elements, selectedIds),
+            );
+          } else if (isConnectorTool(tool)) {
+            // Track the hovered connection point and preview the snap
+            const snapThreshold = HANDLE_SIZE / viewport.zoom;
+            lastConnectorPointRef.current = canvasPoint;
+            setHoveredConnectionPoint(
+              hitTestConnectionPoint(canvasPoint, elements, snapThreshold),
+            );
+            if (arrowStart) {
+              updatePreview(tool, canvasPoint, snapThreshold, e.shiftKey);
+            }
+          }
+          break;
       }
     },
     [
@@ -1132,81 +1097,69 @@ export function useCanvasInteraction(
     ],
   );
 
-  // ── Pointer up on SVG ──
+  // ── Pointer up on SVG: end the active gesture ──
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       const svg = svgRef.current;
-      if (!svg) return;
+      if (!svg || mode === "none") return;
 
-      if (mode === "panning") {
-        setMode("none");
-        setPanStart(null);
-        setPanViewportStart(null);
-        svg.releasePointerCapture(e.pointerId);
-        return;
-      }
+      setMode("none");
+      svg.releasePointerCapture(e.pointerId);
 
-      if (mode === "dragging") {
-        endDrag();
-        setMode("none");
-        svg.releasePointerCapture(e.pointerId);
+      switch (mode) {
+        case "panning":
+          setPanStart(null);
+          setPanViewportStart(null);
+          break;
 
-        const pendingEdit = pendingEditRef.current;
-        pendingEditRef.current = null;
-        if (
-          pendingEdit &&
-          Math.hypot(
-            e.clientX - pendingEdit.screenStart.x,
-            e.clientY - pendingEdit.screenStart.y,
-          ) < CLICK_SLOP_PX
-        ) {
-          const element = elements.find((el) => el.id === pendingEdit.elementId);
+        case "dragging": {
+          endDrag();
+          // A click (no real drag) on the sole selection opens its text editor
+          const pendingEdit = pendingEditRef.current;
+          pendingEditRef.current = null;
+          const isClick =
+            pendingEdit &&
+            Math.hypot(
+              e.clientX - pendingEdit.screenStart.x,
+              e.clientY - pendingEdit.screenStart.y,
+            ) < CLICK_SLOP_PX;
+          const element = isClick && elements.find((el) => el.id === pendingEdit.elementId);
           if (element) openTextEditor(element);
+          break;
         }
-        return;
-      }
 
-      if (mode === "resizing") {
-        endResize();
-        setMode("none");
-        svg.releasePointerCapture(e.pointerId);
-        return;
-      }
+        case "resizing":
+          endResize();
+          break;
 
-      if (mode === "creating") {
-        creationRef.current = null;
-        setMode("none");
-        dispatch({ type: "END_HISTORY" });
-        svg.releasePointerCapture(e.pointerId);
-        return;
-      }
+        case "creating":
+          creationRef.current = null;
+          dispatch({ type: "END_HISTORY" });
+          break;
 
-      if (mode === "marqueeing") {
-        const marquee = marqueeRef.current;
-        marqueeRef.current = null;
-        setMarqueeBounds(null);
-        setMode("none");
-        svg.releasePointerCapture(e.pointerId);
-
-        // Cancelled via Escape (ref cleared mid-gesture)
-        if (!marquee) return;
-
-        const result = resolveMarqueeSelection({
-          startPoint: marquee.startPoint,
-          endPoint: getCanvasPoint(e),
-          screenStart: marquee.screenStart,
-          screenEnd: { x: e.clientX, y: e.clientY },
-          additive: marquee.additive,
-          selectedIds,
-          elements,
-        });
-
-        if (result.type === "clear") {
-          dispatch({ type: "CLEAR_SELECTION" });
-        } else if (result.type === "set") {
-          dispatch({ type: "SET_SELECTION", ids: result.ids });
+        case "marqueeing": {
+          const marquee = marqueeRef.current;
+          marqueeRef.current = null;
+          setMarqueeBounds(null);
+          // A null marquee was cancelled via Escape mid-gesture
+          const result =
+            marquee &&
+            resolveMarqueeSelection({
+              startPoint: marquee.startPoint,
+              endPoint: getCanvasPoint(e),
+              screenStart: marquee.screenStart,
+              screenEnd: { x: e.clientX, y: e.clientY },
+              additive: marquee.additive,
+              selectedIds,
+              elements,
+            });
+          if (result?.type === "clear") {
+            dispatch({ type: "CLEAR_SELECTION" });
+          } else if (result?.type === "set") {
+            dispatch({ type: "SET_SELECTION", ids: result.ids });
+          }
+          break;
         }
-        return;
       }
     },
     [
