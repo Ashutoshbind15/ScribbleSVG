@@ -46,3 +46,5 @@ Override individual colors with the `colors` prop. Helpers live under `@scribble
 ## Icons
 
 Same catalog model as the editor: pass `icons` so `iconId` values resolve. Missing icons show a dashed placeholder.
+
+For serialization or export, pass `forExport` to render images immediately without loading placeholders. When rasterizing the SVG via an `<img>`, use self-contained image sources such as data URLs; external URLs do not load there.

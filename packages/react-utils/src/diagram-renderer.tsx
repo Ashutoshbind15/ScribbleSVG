@@ -99,6 +99,8 @@ export type DiagramRendererProps = {
   colorPreset?: DiagramColorPreset;
   /** Override individual colors on top of the preset. */
   colors?: Partial<DiagramColors>;
+  /** Render visible images for serialization/export. For rasterization via <img>, use self-contained sources such as data URLs; external URLs do not load there. */
+  forExport?: boolean;
   className?: string;
   style?: CSSProperties;
   "aria-label"?: string;
@@ -109,6 +111,7 @@ export function DiagramRenderer({
   icons,
   colorPreset,
   colors,
+  forExport,
   className,
   style,
   "aria-label": ariaLabel,
@@ -152,7 +155,11 @@ export function DiagramRenderer({
         return (
           <g key={element.id} data-element-id={element.id}>
             {element.type === "image" ? (
-              <ImageArtwork element={element} color={resolvedColors.text} />
+              forExport ? (
+                <image x={element.x} y={element.y} width={element.width} height={element.height} href={element.src} preserveAspectRatio="xMidYMid slice" role={element.alt ? "img" : undefined} aria-label={element.alt} pointerEvents="none" />
+              ) : (
+                <ImageArtwork element={element} color={resolvedColors.text} />
+              )
             ) : element.type === "icon" ? (
               <IconArtwork
                 iconId={element.iconId}
