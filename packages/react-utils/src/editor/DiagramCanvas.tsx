@@ -54,11 +54,10 @@ export interface DiagramCanvasProps {
   /**
    * Shows an Image toolbar button. Resolve with the image to insert (its
    * `src` is stored as-is in the document), or `null` to cancel.
+   * The editor loads the image to measure its natural size.
    */
   onRequestImage?: () => Promise<{
     src: string;
-    naturalWidth: number;
-    naturalHeight: number;
     alt?: string;
   } | null>;
   /** Optional class on the editor root (e.g. for a fixed height). Requires editor.css. */
@@ -79,6 +78,11 @@ export function DiagramCanvas({
   const [state, dispatch] = useCanvasReducer(initialDocument);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const catalog = useMemo(() => partitionIconCatalog(icons), [icons]);
 
@@ -150,18 +154,26 @@ export function DiagramCanvas({
     } catch {
       return; // The host reports its own errors.
     }
-    if (!result) return;
+    if (!result || !mountedRef.current) return;
+    const img = new Image();
+    try {
+      img.src = result.src;
+      await img.decode();
+    } catch {
+      return;
+    }
+    if (!mountedRef.current || !(img.naturalWidth > 0) || !(img.naturalHeight > 0)) return;
 
     const element: ImageElement = {
       type: "image",
       id: crypto.randomUUID(),
       seed: generateSeed(),
       src: result.src,
-      naturalWidth: result.naturalWidth,
-      naturalHeight: result.naturalHeight,
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight,
       ...(result.alt ? { alt: result.alt } : {}),
       ...fitImageToViewport(
-        { width: result.naturalWidth, height: result.naturalHeight },
+        { width: img.naturalWidth, height: img.naturalHeight },
         viewportRef.current,
         sizeRef.current,
       ),
