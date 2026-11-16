@@ -293,11 +293,20 @@ export function DiagramCanvas({
     if (refocus) focusViewport();
   };
 
-  // A lost keyup can't leave Space-pan or the Shift snap stuck on.
   const handleRootBlur = (e: React.FocusEvent) => {
-    if (!rootRef.current?.contains(e.relatedTarget as Node | null)) {
-      releaseHeldKeys();
-    }
+    if (rootRef.current?.contains(e.relatedTarget as Node | null)) return;
+    // A lost keyup can't leave Space-pan or the Shift snap stuck on.
+    releaseHeldKeys();
+    // Focus leaving the editor deselects, so nothing looks ready for keys it
+    // won't get. Checked after the event settles: closing the text editor
+    // drops focus for a moment before the canvas takes it back, and switching
+    // windows or tabs (document loses focus) keeps the selection.
+    window.setTimeout(() => {
+      const root = rootRef.current;
+      if (!root || !document.hasFocus()) return;
+      if (root.contains(document.activeElement)) return;
+      dispatch({ type: "CLEAR_SELECTION" });
+    });
   };
   const releaseHeldKeysRef = useRef(releaseHeldKeys);
   releaseHeldKeysRef.current = releaseHeldKeys;

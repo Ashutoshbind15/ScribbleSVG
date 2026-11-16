@@ -18,6 +18,7 @@ Keyboard shortcuts are scoped to the focused editor:
 - **Behaviour change for embedders:** shortcuts no longer work without focus. They used to listen on `window`, so keys typed anywhere on the page (a form field, a second editor) could edit the diagram. Now they only apply while focus is inside the editor; pressing the canvas or a toolbar button gives it focus.
 - New `autoFocus` prop on `DiagramCanvas` focuses the canvas on mount, so shortcuts work before the first click
 - The canvas shows a focus ring for keyboard focus (`:focus-visible` in `editor.css`)
+- Focus leaving the editor clears the selection (switching windows or tabs keeps it)
 - A Space or Shift held when focus leaves the editor is released, so panning and snapping can't stay stuck on
 - The shortcuts panel is generated from the same keymap as the keys, so it can't drift
 - **Breaking for direct `useCanvasInteraction` users:** the hook no longer listens for keys. It returns the commands (`handleDelete`, `handleCopy`, `handleCut`, `handlePaste`, `stepSelectionFontSize`, `cancelGesture`, `setSpaceHeld`, `setShiftSnap`, `releaseHeldKeys`) for your own key handler; `DiagramCanvas` wires them up for you

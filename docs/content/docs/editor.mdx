@@ -60,7 +60,7 @@ Shortcuts (undo/redo, copy/cut/paste, Delete, Space-pan, Shift-snap, text size, 
 - The canvas is focusable (`tabIndex={0}`) and shows a focus ring only for keyboard focus (`:focus-visible`).
 - Pressing anywhere in the editor, including toolbar buttons, gives the canvas focus. Tabbing to a toolbar button leaves focus on the button; shortcuts still work there, except Space and Enter, which press the button.
 - Text fields keep all their keys: the inline text editor, and any input, textarea, select or contenteditable you render inside the editor.
-- When focus leaves the editor, a held Space (pan) or Shift (snap) is released, so it can't stay stuck on.
+- When focus leaves the editor, the selection is cleared, and a held Space (pan) or Shift (snap) is released so it can't stay stuck on. Switching to another window or tab keeps the selection.
 - Pinch and Ctrl/⌘ + scroll zoom work without focus.
 
 Pass `autoFocus` to focus the canvas on mount, so shortcuts work before the first click. Use it when the editor is the main thing on the page; leave it off when the editor sits among other content, since it takes focus from the rest of the page.
