@@ -6,7 +6,6 @@ import {
   getElementBounds,
   isConnector,
   isLabeledShape,
-  type Bounds,
   type CircleElement,
   type CylinderElement,
   type DiagramDocument,
@@ -19,10 +18,8 @@ import {
 } from "@scribblesvg/core";
 import { screenToCanvas } from "./coordinate-utils";
 import {
-  boundsFromPoints,
   CORNER_HANDLES,
   getGroupSelectionBounds,
-  HANDLE_CURSORS,
   hitTestGroupSelection,
   hitTestSelection,
   hitTestTextTarget,
@@ -31,6 +28,19 @@ import {
   resolveMarqueeSelection,
 } from "./hit-test";
 import type { HandlePosition, ConnectionPointHit } from "./hit-test";
+import {
+  cancelMarquee,
+  clickEditTarget,
+  creationPatch,
+  gestureCursor,
+  getMarqueeBounds,
+  IDLE,
+  moveMarquee,
+  panViewport,
+  type CreationType,
+  type Gesture,
+  type PendingEdit,
+} from "./gesture";
 import { useElementDrag } from "./useElementDrag";
 import { useElementResize } from "./useElementResize";
 import { useArrowCreation } from "./useArrowCreation";
@@ -57,9 +67,6 @@ const DEFAULT_ICON_SIZE = { width: 150, height: 80 };
 
 /** Handle half-size in canvas-space pixels */
 const HANDLE_SIZE = 5;
-
-/** Screen-space pointer travel below which a press-release counts as a click. */
-const CLICK_SLOP_PX = 3;
 
 /** Current value of the inline editor's textarea (state lags keystrokes). */
 function readLiveEditorText(fallback: string): string {
@@ -124,22 +131,6 @@ function createIconElement(
   };
 }
 
-/** Size patch for an element being click-dragged out from `creation.startPoint`. */
-function creationPatch(creation: CreationState, point: Point): Partial<DiagramElement> {
-  const start = creation.startPoint;
-  const dx = point.x - start.x;
-  const dy = point.y - start.y;
-  if (creation.type === "circle") {
-    return { cx: start.x, cy: start.y, radius: Math.max(10, Math.hypot(dx, dy)) };
-  }
-  return {
-    x: Math.min(start.x, point.x),
-    y: Math.min(start.y, point.y),
-    width: Math.max(20, Math.abs(dx)),
-    height: Math.max(20, Math.abs(dy)),
-  };
-}
-
 /**
  * The resize handle under `point` for the current selection: the corner
  * handles of a multi-selection's group box, or a single element's box handles.
@@ -162,33 +153,6 @@ function hitTestSelectionHandle(
   return hasBoxHandles
     ? hitTestResizeHandle(point, getElementBounds(selected), handleSize)
     : null;
-}
-
-/**
- * What the current pointer interaction is.
- */
-type InteractionMode =
-  | "none"
-  | "panning"
-  | "dragging"
-  | "resizing"
-  | "creating" // click-drag to define size
-  | "marqueeing"; // drag a virtual rect to multi-select
-
-interface CreationState {
-  type: "rectangle" | "circle" | "cylinder" | "diamond" | "icon";
-  startPoint: { x: number; y: number };
-  elementId: string;
-  seed: number;
-}
-
-interface MarqueeState {
-  startPoint: { x: number; y: number };
-  currentPoint: { x: number; y: number };
-  /** Screen coords at pointer-down — used to distinguish click vs drag. */
-  screenStart: { x: number; y: number };
-  /** Shift held at start → union with existing selection on release. */
-  additive: boolean;
 }
 
 /**
@@ -261,32 +225,13 @@ export function useCanvasInteraction(
     }
   }, [tool]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Interaction mode
-  const [mode, setMode] = useState<InteractionMode>("none");
-  // Handle held during "resizing", for the cursor
-  const [resizeHandle, setResizeHandle] = useState<HandlePosition>("se");
+  const [gesture, setGesture] = useState<Gesture>(IDLE);
 
   // Select tool: whether the pointer is over something a click would pick up
   const [hoveringSelectable, setHoveringSelectable] = useState(false);
 
-  // Pan state
-  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(
-    null,
-  );
-  const [panViewportStart, setPanViewportStart] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
-
   // Space key for space+click panning
   const [spaceHeld, setSpaceHeld] = useState(false);
-
-  // Creation drag state
-  const creationRef = useRef<CreationState | null>(null);
-
-  // Marquee (box) selection state
-  const marqueeRef = useRef<MarqueeState | null>(null);
-  const [marqueeBounds, setMarqueeBounds] = useState<Bounds | null>(null);
 
   // ── Text editing state ──
   const [editingTarget, setEditingTarget] = useState<EditingTarget | null>(
@@ -295,15 +240,6 @@ export function useCanvasInteraction(
   /** Live editing target; cleared on commit so a late blur can't commit twice. */
   const editingTargetRef = useRef(editingTarget);
   editingTargetRef.current = editingTarget;
-
-  /**
-   * Set when the press lands on the already sole-selected element; if it is
-   * released without dragging, that click opens the element's text editor.
-   */
-  const pendingEditRef = useRef<{
-    elementId: string;
-    screenStart: { x: number; y: number };
-  } | null>(null);
 
   /** True while a new standalone text element's create+edit is one undo group. */
   const textHistoryOpenRef = useRef(false);
@@ -409,10 +345,7 @@ export function useCanvasInteraction(
   const cancelGesture = useCallback(() => {
     cancelArrow();
     // Pointer-up still ends the gesture and releases capture.
-    if (marqueeRef.current) {
-      marqueeRef.current = null;
-      setMarqueeBounds(null);
-    }
+    setGesture(cancelMarquee);
   }, [cancelArrow]);
 
   const releaseHeldKeys = useCallback(() => {
@@ -674,8 +607,7 @@ export function useCanvasInteraction(
         e.preventDefault();
         e.stopPropagation();
         if (startGroupScale(selectedIds, handle, getCanvasPoint(e))) {
-          setMode("resizing");
-          setResizeHandle(handle);
+          setGesture({ type: "resizing", handle });
           svg.setPointerCapture(e.pointerId);
         }
         return;
@@ -690,8 +622,7 @@ export function useCanvasInteraction(
       e.stopPropagation();
 
       const canvasPoint = getCanvasPoint(e);
-      setMode("resizing");
-      setResizeHandle(handle);
+      setGesture({ type: "resizing", handle });
       startResize(selectedId, handle, canvasPoint);
       svg.setPointerCapture(e.pointerId);
     },
@@ -712,18 +643,17 @@ export function useCanvasInteraction(
     (
       e: React.PointerEvent<SVGSVGElement>,
       svg: SVGSVGElement,
-      type: CreationState["type"],
+      elementType: CreationType,
       element: DiagramElement,
       point: Point,
     ) => {
       e.preventDefault();
-      creationRef.current = {
-        type,
-        startPoint: point,
+      setGesture({
+        type: "creating",
+        elementType,
         elementId: element.id,
-        seed: element.seed,
-      };
-      setMode("creating");
+        startPoint: point,
+      });
       dispatch({ type: "BEGIN_HISTORY" });
       dispatch({ type: "ADD_ELEMENT", element });
       dispatch({ type: "SET_TOOL", tool: "select" });
@@ -752,9 +682,8 @@ export function useCanvasInteraction(
       point: Point,
       targets: DiagramElement[],
     ) => {
-      pendingEditRef.current = null;
-      const beginGesture = (next: InteractionMode) => {
-        setMode(next);
+      const beginGesture = (next: Gesture) => {
+        setGesture(next);
         svg.setPointerCapture(e.pointerId);
       };
 
@@ -767,11 +696,11 @@ export function useCanvasInteraction(
 
       if (resizing) {
         e.preventDefault();
-        setResizeHandle(handle);
-        beginGesture("resizing");
+        beginGesture({ type: "resizing", handle });
       } else if (hitElement) {
         e.stopPropagation();
         const alreadySelected = selectedIds.has(hitElement.id);
+        let pendingEdit: PendingEdit | null = null;
         if (e.shiftKey) {
           const next = new Set(selectedIds);
           if (alreadySelected) next.delete(hitElement.id);
@@ -781,29 +710,28 @@ export function useCanvasInteraction(
           dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
         } else if (!editingTarget && selectedIds.size === 1) {
           // Clicking the sole selection again edits its text (on release)
-          pendingEditRef.current = {
+          pendingEdit = {
             elementId: hitElement.id,
             screenStart: { x: e.clientX, y: e.clientY },
           };
         }
-        beginGesture("dragging");
+        beginGesture({ type: "dragging", pendingEdit });
         startDrag(alreadySelected ? Array.from(selectedIds) : [hitElement.id], point);
       } else if (!e.shiftKey && hitTestGroupSelection(point, targets, selectedIds)) {
         // Empty space inside a multi-selection's group box drags the group
         e.stopPropagation();
-        beginGesture("dragging");
+        beginGesture({ type: "dragging", pendingEdit: null });
         startDrag(Array.from(selectedIds), point);
       } else {
         // Empty canvas → box selection (click without drag clears)
         e.preventDefault();
-        marqueeRef.current = {
+        beginGesture({
+          type: "marqueeing",
           startPoint: point,
           currentPoint: point,
           screenStart: { x: e.clientX, y: e.clientY },
           additive: e.shiftKey,
-        };
-        setMarqueeBounds(boundsFromPoints(point, point));
-        beginGesture("marqueeing");
+        });
       }
     },
     [selectedIds, viewport.zoom, editingTarget, dispatch, startSelectionResize, startDrag],
@@ -830,9 +758,11 @@ export function useCanvasInteraction(
       // Middle-click or space+left-click → pan, whatever the tool
       if (e.button === 1 || (e.button === 0 && spaceHeld)) {
         e.preventDefault();
-        setMode("panning");
-        setPanStart({ x: e.clientX, y: e.clientY });
-        setPanViewportStart({ x: viewport.x, y: viewport.y });
+        setGesture({
+          type: "panning",
+          screenStart: { x: e.clientX, y: e.clientY },
+          viewportStart: { x: viewport.x, y: viewport.y },
+        });
         svg.setPointerCapture(e.pointerId);
         return;
       }
@@ -935,18 +865,12 @@ export function useCanvasInteraction(
     (e: React.PointerEvent<SVGSVGElement>) => {
       const canvasPoint = getCanvasPoint(e);
 
-      switch (mode) {
+      switch (gesture.type) {
         case "panning":
-          if (panStart && panViewportStart) {
-            dispatch({
-              type: "SET_VIEWPORT",
-              viewport: {
-                ...viewport,
-                x: panViewportStart.x - (e.clientX - panStart.x) / viewport.zoom,
-                y: panViewportStart.y - (e.clientY - panStart.y) / viewport.zoom,
-              },
-            });
-          }
+          dispatch({
+            type: "SET_VIEWPORT",
+            viewport: panViewport(gesture, viewport, { x: e.clientX, y: e.clientY }),
+          });
           break;
 
         case "dragging":
@@ -957,26 +881,20 @@ export function useCanvasInteraction(
           continueResize(canvasPoint, e.shiftKey);
           break;
 
-        case "creating": {
-          const creation = creationRef.current;
-          if (creation) {
-            dispatch({
-              type: "UPDATE_ELEMENT",
-              id: creation.elementId,
-              patch: creationPatch(creation, canvasPoint),
-            });
-          }
+        case "creating":
+          dispatch({
+            type: "UPDATE_ELEMENT",
+            id: gesture.elementId,
+            patch: creationPatch(gesture, canvasPoint),
+          });
           break;
-        }
 
-        case "marqueeing": {
-          const marquee = marqueeRef.current;
-          if (marquee) {
-            marqueeRef.current = { ...marquee, currentPoint: canvasPoint };
-            setMarqueeBounds(boundsFromPoints(marquee.startPoint, canvasPoint));
-          }
+        case "marqueeing":
+          setGesture((current) => moveMarquee(current, canvasPoint));
           break;
-        }
+
+        case "marqueeCancelled":
+          break;
 
         case "none":
           if (tool === "select") {
@@ -1000,9 +918,7 @@ export function useCanvasInteraction(
     },
     [
       getCanvasPoint,
-      mode,
-      panStart,
-      panViewportStart,
+      gesture,
       viewport,
       dispatch,
       continueDrag,
@@ -1019,29 +935,21 @@ export function useCanvasInteraction(
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       const svg = svgRef.current;
-      if (!svg || mode === "none") return;
+      if (!svg || gesture.type === "none") return;
 
-      setMode("none");
+      setGesture(IDLE);
       svg.releasePointerCapture(e.pointerId);
 
-      switch (mode) {
+      switch (gesture.type) {
         case "panning":
-          setPanStart(null);
-          setPanViewportStart(null);
+        case "marqueeCancelled":
           break;
 
         case "dragging": {
           endDrag();
           // A click (no real drag) on the sole selection opens its text editor
-          const pendingEdit = pendingEditRef.current;
-          pendingEditRef.current = null;
-          const isClick =
-            pendingEdit &&
-            Math.hypot(
-              e.clientX - pendingEdit.screenStart.x,
-              e.clientY - pendingEdit.screenStart.y,
-            ) < CLICK_SLOP_PX;
-          const element = isClick && elements.find((el) => el.id === pendingEdit.elementId);
+          const editId = clickEditTarget(gesture, { x: e.clientX, y: e.clientY });
+          const element = editId && elements.find((el) => el.id === editId);
           if (element) openTextEditor(element);
           break;
         }
@@ -1051,29 +959,22 @@ export function useCanvasInteraction(
           break;
 
         case "creating":
-          creationRef.current = null;
           dispatch({ type: "END_HISTORY" });
           break;
 
         case "marqueeing": {
-          const marquee = marqueeRef.current;
-          marqueeRef.current = null;
-          setMarqueeBounds(null);
-          // A null marquee was cancelled via Escape mid-gesture
-          const result =
-            marquee &&
-            resolveMarqueeSelection({
-              startPoint: marquee.startPoint,
-              endPoint: getCanvasPoint(e),
-              screenStart: marquee.screenStart,
-              screenEnd: { x: e.clientX, y: e.clientY },
-              additive: marquee.additive,
-              selectedIds,
-              elements,
-            });
-          if (result?.type === "clear") {
+          const result = resolveMarqueeSelection({
+            startPoint: gesture.startPoint,
+            endPoint: getCanvasPoint(e),
+            screenStart: gesture.screenStart,
+            screenEnd: { x: e.clientX, y: e.clientY },
+            additive: gesture.additive,
+            selectedIds,
+            elements,
+          });
+          if (result.type === "clear") {
             dispatch({ type: "CLEAR_SELECTION" });
-          } else if (result?.type === "set") {
+          } else if (result.type === "set") {
             dispatch({ type: "SET_SELECTION", ids: result.ids });
           }
           break;
@@ -1082,7 +983,7 @@ export function useCanvasInteraction(
     },
     [
       svgRef,
-      mode,
+      gesture,
       endDrag,
       endResize,
       dispatch,
@@ -1096,14 +997,12 @@ export function useCanvasInteraction(
   // ── Cursor ──
   const getCursor = useCallback(() => {
     if (editingTarget) return "text";
-    if (mode === "panning") return "grabbing";
-    if (mode === "resizing") return HANDLE_CURSORS[resizeHandle];
-    if (mode === "dragging") return "move";
-    if (mode === "marqueeing") return "crosshair";
+    const cursor = gestureCursor(gesture);
+    if (cursor) return cursor;
     if (spaceHeld) return "grab";
     if (tool === "select") return hoveringSelectable ? "move" : "default";
     return "crosshair";
-  }, [mode, resizeHandle, spaceHeld, tool, editingTarget, hoveringSelectable]);
+  }, [gesture, spaceHeld, tool, editingTarget, hoveringSelectable]);
 
   return {
     handlePointerDown,
@@ -1117,7 +1016,7 @@ export function useCanvasInteraction(
     previewEnd,
     previewStart,
     hoveredConnectionPoint,
-    marqueeBounds,
+    marqueeBounds: getMarqueeBounds(gesture),
     spaceHeld,
     handleSize: HANDLE_SIZE,
     handleDelete,
