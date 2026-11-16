@@ -11,6 +11,7 @@
     "dev:docs": "pnpm --filter docs dev",
     "build": "pnpm -r run build",
     "build:docs": "pnpm --filter docs build",
+    "build:packages": "pnpm --filter @scribblesvg/core --filter @scribblesvg/react-utils build",
     "clean": "pnpm -r run clean",
     "typecheck": "pnpm -r run typecheck",
     "test": "node --import tsx --test --test-reporter=spec tests/**/*.test.ts",
