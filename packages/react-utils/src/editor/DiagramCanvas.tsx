@@ -237,8 +237,13 @@ export function DiagramCanvas({
   const handleRootKeyUp = runKey;
 
   // ── Focus ──
+  /**
+   * Focus never comes from Tab here (presses, autoFocus, leaving the text
+   * editor), so ask for no ring: Chrome otherwise shows :focus-visible for a
+   * script focus inside a pointer press.
+   */
   const focusViewport = useCallback(() => {
-    containerRef.current?.focus({ preventScroll: true });
+    containerRef.current?.focus({ preventScroll: true, focusVisible: false });
   }, []);
 
   /** The inline text editor's textarea has focus. */
