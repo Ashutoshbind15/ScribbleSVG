@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RedoIcon, UndoIcon } from "./toolbarIcons";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
@@ -27,6 +27,15 @@ import { InlineTextEditor } from "./InlineTextEditor";
 import { Toolbar } from "./Toolbar";
 import { TextSizeGrip } from "./TextSizeGrip";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
+import {
+  PREVENT_DEFAULT,
+  isApplePlatform,
+  isTextEntry,
+  resolveShortcut,
+  targetOwnsKey,
+  type Command,
+} from "./keymap";
+import { useHeldModifiers } from "./useHeldModifiers";
 import { measureDomTextSize } from "./measureDomText";
 import { useCanvasInteraction } from "./useCanvasInteraction";
 import { partitionIconCatalog, type DiagramIcon } from "../icons";
@@ -62,6 +71,11 @@ export interface DiagramCanvasProps {
   } | null>;
   /** Optional class on the editor root (e.g. for a fixed height). Requires editor.css. */
   className?: string;
+  /**
+   * Focus the canvas on mount, so shortcuts work before the first click.
+   * Shortcuts only reach the editor while focus is inside it.
+   */
+  autoFocus?: boolean;
 }
 
 /**
@@ -74,9 +88,12 @@ export function DiagramCanvas({
   icons,
   onRequestImage,
   className,
+  autoFocus = false,
 }: DiagramCanvasProps) {
   const [state, dispatch] = useCanvasReducer(initialDocument);
   const svgRef = useRef<SVGSVGElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  /** The viewport: the editor's focus target for shortcuts. */
   const containerRef = useRef<HTMLDivElement>(null);
 
   const catalog = useMemo(() => partitionIconCatalog(icons), [icons]);
@@ -123,6 +140,16 @@ export function DiagramCanvas({
     marqueeBounds,
     spaceHeld,
     handleSize,
+    // Keyboard commands
+    handleDelete,
+    handleCopy,
+    handleCut,
+    handlePaste,
+    stepSelectionFontSize,
+    cancelGesture,
+    setSpaceHeld,
+    setShiftSnap,
+    releaseHeldKeys,
     // Text editing
     editingTarget,
     commitTextEditing,
@@ -132,6 +159,156 @@ export function DiagramCanvas({
     updateEditingLayout,
     updateEditingText,
   } = useCanvasInteraction(state, dispatch, svgRef, size, catalog.valid);
+
+  // ── Keyboard: one handler on the root, resolved through keymap.ts ──
+  const [helpOpen, setHelpOpen] = useState(false);
+  // Detected after mount so server and first client render agree.
+  const [isApple, setIsApple] = useState(false);
+  useEffect(() => {
+    setIsApple(isApplePlatform());
+  }, []);
+
+  /** Runs `command`; the return value feeds PREVENT_DEFAULT's "ifHandled". */
+  const runCommand = (command: Command): boolean => {
+    switch (command.type) {
+      case "undo":
+        dispatch({ type: "UNDO" });
+        return true;
+      case "redo":
+        dispatch({ type: "REDO" });
+        return true;
+      case "copy":
+        return handleCopy();
+      case "cut":
+        handleCut();
+        return true;
+      case "paste":
+        void handlePaste();
+        return true;
+      case "delete":
+        handleDelete();
+        return true;
+      case "fontStep":
+        stepSelectionFontSize(command.direction);
+        return true;
+      case "cancelGesture":
+        cancelGesture();
+        return true;
+      case "toggleHelp":
+        setHelpOpen((open) => !open);
+        return true;
+      case "closeHelp":
+        setHelpOpen(false);
+        if (command.cancelGesture) cancelGesture();
+        return true;
+      case "panHold":
+      case "panRelease":
+        setSpaceHeld(command.type === "panHold");
+        return true;
+      case "snapHold":
+      case "snapRelease":
+        setShiftSnap(command.type === "snapHold");
+        return true;
+    }
+  };
+
+  const runKey = (e: React.KeyboardEvent) => {
+    const command = resolveShortcut(e, {
+      hasSelection: state.selectedIds.size > 0,
+      editingText: editingTarget !== null,
+      helpOpen,
+      isApple,
+    });
+    if (!command) return;
+    const handled = runCommand(command);
+    const prevent = PREVENT_DEFAULT[command.type];
+    if (prevent === true || (prevent === "ifHandled" && handled)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleRootKeyDown = (e: React.KeyboardEvent) => {
+    if (targetOwnsKey(e.target, e.code)) return;
+    runKey(e);
+  };
+
+  // Releases skip the ownership check: a key held on the canvas may come up
+  // after focus moved to a button, and releasing never prevents default.
+  const handleRootKeyUp = runKey;
+
+  // ── Focus ──
+  const focusViewport = useCallback(() => {
+    containerRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  /** The inline text editor's textarea has focus. */
+  const inlineEditorHasFocus = () => {
+    const active = document.activeElement;
+    return (
+      isTextEntry(active) && !!active && !!rootRef.current?.contains(active)
+    );
+  };
+
+  /**
+   * One pointer rule: a press anywhere in the editor gives the canvas focus,
+   * unless it's on a text field. Capture phase, so a child's
+   * preventDefault/stopPropagation can't skip it.
+   */
+  const handleRootPointerDownCapture = (e: React.PointerEvent) => {
+    if (isTextEntry(e.target)) return;
+    if (
+      inlineEditorHasFocus() &&
+      containerRef.current?.contains(e.target as Node)
+    ) {
+      // Focusing now would blur (and commit) the inline editor before the
+      // canvas's pointerdown runs, so that press would see editing already
+      // over. Let the canvas act first: it commits the edit itself, or keeps
+      // it open (text size grip). Then take focus if the editor closed.
+      window.setTimeout(() => {
+        if (!inlineEditorHasFocus()) focusViewport();
+      });
+      return;
+    }
+    focusViewport();
+  };
+
+  /** Stops the browser moving focus to toolbar buttons on press. */
+  const handleRootMouseDownCapture = (e: React.MouseEvent) => {
+    if (!isTextEntry(e.target)) e.preventDefault();
+  };
+
+  /**
+   * Escape commits while the textarea still has focus: hand focus back to the
+   * canvas so shortcuts keep working once it unmounts. A blur commit leaves
+   * focus wherever the user put it.
+   */
+  const handleEditorCommit: typeof commitTextEditing = (...args) => {
+    const refocus = inlineEditorHasFocus();
+    commitTextEditing(...args);
+    if (refocus) focusViewport();
+  };
+
+  // A lost keyup can't leave Space-pan or the Shift snap stuck on.
+  const handleRootBlur = (e: React.FocusEvent) => {
+    if (!rootRef.current?.contains(e.relatedTarget as Node | null)) {
+      releaseHeldKeys();
+    }
+  };
+  const releaseHeldKeysRef = useRef(releaseHeldKeys);
+  releaseHeldKeysRef.current = releaseHeldKeys;
+  useEffect(() => {
+    const onWindowBlur = () => releaseHeldKeysRef.current();
+    window.addEventListener("blur", onWindowBlur);
+    return () => window.removeEventListener("blur", onWindowBlur);
+  }, []);
+
+  useEffect(() => {
+    if (autoFocus) focusViewport();
+    // Mount only: autoFocus is an initial-focus hint, like the HTML attribute.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const modKeyHeld = useHeldModifiers();
 
   // ── Wheel zoom (native listener for non-passive preventDefault) ──
   // Store latest values in refs so the native listener always sees current state
@@ -171,19 +348,6 @@ export function DiagramCanvas({
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
-
-    // Pinch synthesizes ctrlKey on wheel events; a real Ctrl/Cmd keydown does not.
-    let modKeyHeld = false;
-    const isZoomModKey = (key: string) => key === "Control" || key === "Meta";
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isZoomModKey(e.key)) modKeyHeld = true;
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (isZoomModKey(e.key)) modKeyHeld = false;
-    };
-    const onBlur = () => {
-      modKeyHeld = false;
-    };
 
     const applyZoom = (e: WheelEvent, sensitivity: number) => {
       const viewport = viewportRef.current;
@@ -239,7 +403,7 @@ export function DiagramCanvas({
       if (e.ctrlKey || e.metaKey) {
         applyZoom(
           e,
-          modKeyHeld ? CTRL_ZOOM_SENSITIVITY : PINCH_ZOOM_SENSITIVITY,
+          modKeyHeld.current ? CTRL_ZOOM_SENSITIVITY : PINCH_ZOOM_SENSITIVITY,
         );
         return;
       }
@@ -262,16 +426,8 @@ export function DiagramCanvas({
     };
 
     svg.addEventListener("wheel", handleWheel, { passive: false });
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", onBlur);
-    return () => {
-      svg.removeEventListener("wheel", handleWheel);
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", onBlur);
-    };
-  }, []); // svgRef is stable; refs handle changing state
+    return () => svg.removeEventListener("wheel", handleWheel);
+  }, []); // svgRef and modKeyHeld are stable; refs handle changing state
 
   const viewBox = getViewBox(state.document.viewport, size.width, size.height);
 
@@ -378,7 +534,13 @@ export function DiagramCanvas({
 
   return (
     <div
+      ref={rootRef}
       className={["scribblesvg-editor", className].filter(Boolean).join(" ")}
+      onKeyDown={handleRootKeyDown}
+      onKeyUp={handleRootKeyUp}
+      onPointerDownCapture={handleRootPointerDownCapture}
+      onMouseDownCapture={handleRootMouseDownCapture}
+      onBlur={handleRootBlur}
     >
       <div className="scribblesvg-editor__header">
         <Toolbar
@@ -410,13 +572,21 @@ export function DiagramCanvas({
             <RedoIcon />
           </button>
         </div>
-        <KeyboardShortcuts />
+        <KeyboardShortcuts
+          open={helpOpen}
+          onOpenChange={setHelpOpen}
+          isApple={isApple}
+        />
         <span className="scribblesvg-editor__zoom">
           {Math.round(state.document.viewport.zoom * 100)}%
         </span>
       </div>
 
-      <div ref={containerRef} className="scribblesvg-editor__viewport">
+      <div
+        ref={containerRef}
+        className="scribblesvg-editor__viewport"
+        tabIndex={0}
+      >
         <svg
           ref={svgRef}
           viewBox={viewBox}
@@ -498,7 +668,7 @@ export function DiagramCanvas({
           {editingTarget && (
             <InlineTextEditor
               target={editingTarget}
-              onCommit={commitTextEditing}
+              onCommit={handleEditorCommit}
               onCancel={cancelTextEditing}
               onLayoutChange={updateEditingLayout}
               onTextChange={updateEditingText}

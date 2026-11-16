@@ -200,10 +200,11 @@ interface MarqueeState {
  * - Dragging elements
  * - Resizing via handles
  * - Arrow creation (two-click)
- * - Deletion (Delete/Backspace)
- * - Copy / cut / paste (Ctrl/Cmd+C/X/V)
- * - Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y)
  * - Click a selected element again to edit its text; double-click adds free text
+ *
+ * Keys are not listened for here: the editor root resolves them through
+ * `keymap.ts` and calls the commands this hook returns (delete, clipboard,
+ * font step, Escape, Space-pan, Shift-snap).
  */
 export function useCanvasInteraction(
   state: CanvasState,
@@ -406,101 +407,26 @@ export function useCanvasInteraction(
     [elements, selectedIds, dispatch],
   );
 
-  // ── Keyboard events ──
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't process keyboard shortcuts while editing text
-      if (editingTarget) return;
+  // ── Keyboard commands (run by the editor root's key handler) ──
 
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
+  /** Escape: drop the arrow being placed and the box-selection preview. */
+  const cancelGesture = useCallback(() => {
+    cancelArrow();
+    // Pointer-up still ends the gesture and releases capture.
+    if (marqueeRef.current) {
+      marqueeRef.current = null;
+      setMarqueeBounds(null);
+    }
+  }, [cancelArrow]);
 
-      if (e.key === "Shift" && !e.repeat) {
-        updateConnectorPreviewForShift(true);
-      }
-      if (e.code === "Space" && !e.repeat) {
-        e.preventDefault();
-        setSpaceHeld(true);
-      }
-      if (
-        (e.code === "Delete" || e.code === "Backspace") &&
-        selectedIds.size > 0
-      ) {
-        e.preventDefault();
-        handleDelete();
-      }
-      if (e.code === "Escape") {
-        cancelArrow();
-        // Clear marquee preview; pointer-up still ends the gesture / releases capture.
-        if (marqueeRef.current) {
-          marqueeRef.current = null;
-          setMarqueeBounds(null);
-        }
-      }
-
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod || e.altKey) return;
-
-      // Ctrl/Cmd+Shift+< / > — by code so the shifted glyph doesn't matter
-      if (e.shiftKey && (e.code === "Period" || e.code === "Comma")) {
-        e.preventDefault();
-        stepSelectionFontSize(e.code === "Period" ? 1 : -1);
-        return;
-      }
-
-      const key = e.key.toLowerCase();
-      if (key === "z") {
-        e.preventDefault();
-        dispatch({ type: e.shiftKey ? "REDO" : "UNDO" });
-      } else if (key === "y" && !e.metaKey) {
-        // Ctrl+Y redo (Windows/Linux); skip on macOS where Cmd+Y is unused here
-        e.preventDefault();
-        dispatch({ type: "REDO" });
-      } else if (key === "c") {
-        if (handleCopy()) e.preventDefault();
-      } else if (key === "x") {
-        if (selectedIds.size > 0) {
-          e.preventDefault();
-          handleCut();
-        }
-      } else if (key === "v") {
-        e.preventDefault();
-        void handlePaste();
-      }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "Shift") {
-        updateConnectorPreviewForShift(false);
-      }
-      if (e.code === "Space") {
-        setSpaceHeld(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-    };
-  }, [
-    selectedIds,
-    editingTarget,
-    dispatch,
-    handleDelete,
-    handleCopy,
-    handleCut,
-    handlePaste,
-    cancelArrow,
-    updateConnectorPreviewForShift,
-    stepSelectionFontSize,
-  ]);
+  /**
+   * Ends Space-pan and the Shift snap preview. Called when focus leaves the
+   * editor, since the keyup for a held key then goes elsewhere.
+   */
+  const releaseHeldKeys = useCallback(() => {
+    setSpaceHeld(false);
+    updateConnectorPreviewForShift(false);
+  }, [updateConnectorPreviewForShift]);
 
   // ── Canvas-space point from pointer event ──
   const getCanvasPoint = useCallback(
@@ -1202,6 +1128,16 @@ export function useCanvasInteraction(
     marqueeBounds,
     spaceHeld,
     handleSize: HANDLE_SIZE,
+    // Keyboard commands
+    handleDelete,
+    handleCopy,
+    handleCut,
+    handlePaste,
+    stepSelectionFontSize,
+    cancelGesture,
+    setSpaceHeld,
+    setShiftSnap: updateConnectorPreviewForShift,
+    releaseHeldKeys,
     // Text editing
     editingTarget,
     commitTextEditing,

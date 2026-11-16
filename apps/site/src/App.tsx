@@ -48,6 +48,7 @@ const App = () => {
           <DiagramCanvas
             initialDocument={document}
             onChange={setDocument}
+            autoFocus
           />
           {!hasContent && (
             <div className="site-empty" aria-hidden="true">
