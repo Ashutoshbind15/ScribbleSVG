@@ -1,8 +1,3 @@
-# Worktrunk project config
-# Isolated: worktree files, node_modules, and branch-specific app ports.
-# Shared: pnpm's content-addressable store. Ports use hash_port (10000–19999).
-# The first `wt switch --create` asks for hook approval.
-
 [pre-start]
 setup = "bash scripts/worktree/setup.sh"
 
