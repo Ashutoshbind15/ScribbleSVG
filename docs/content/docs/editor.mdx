@@ -53,6 +53,22 @@ The editor fills its container (`height: 100%`). Give it a bounded height with y
 <DiagramCanvas className="diagram-editor-panel" onChange={save} />
 ```
 
+## Keyboard and focus
+
+Shortcuts (undo/redo, copy/cut/paste, Delete, Space-pan, Shift-snap, text size, Escape, `?` for the shortcuts panel) only reach the editor while focus is inside it. Keys typed elsewhere on your page, such as in a form field or in a second editor, never change the diagram.
+
+- The canvas is focusable (`tabIndex={0}`) and shows a focus ring only for keyboard focus (`:focus-visible`).
+- Pressing anywhere in the editor, including toolbar buttons, gives the canvas focus. Tabbing to a toolbar button leaves focus on the button; shortcuts still work there, except Space and Enter, which press the button.
+- Text fields keep all their keys: the inline text editor, and any input, textarea, select or contenteditable you render inside the editor.
+- When focus leaves the editor, a held Space (pan) or Shift (snap) is released, so it can't stay stuck on.
+- Pinch and Ctrl/⌘ + scroll zoom work without focus.
+
+Pass `autoFocus` to focus the canvas on mount, so shortcuts work before the first click. Use it when the editor is the main thing on the page; leave it off when the editor sits among other content, since it takes focus from the rest of the page.
+
+```tsx
+<DiagramCanvas autoFocus onChange={save} />
+```
+
 ## Icons
 
 Documents store only `iconId` on icon elements. Pass the matching `icons` array so artwork can resolve. Unresolved ids render a dashed “Missing icon” placeholder.
