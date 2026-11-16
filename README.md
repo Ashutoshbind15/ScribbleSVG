@@ -29,12 +29,12 @@ pnpm --filter docs dev
 
 Open [http://localhost:4000](http://localhost:4000).
 
-## License
-
-MIT
-
 ## Parallel work with worktrees
 
 Install [Worktrunk](https://worktrunk.dev/) and its shell integration (`wt config shell install`). Create a worktree with `wt switch --create <branch>`; add `--base @` to stack it on the current branch. The first use asks you to approve the project hooks. They install dependencies, build the shared packages, and start the site and playground on branch-specific ports.
 
 Run `wt urls` to see all three URLs, `wt dev` to start the site and playground again, or `wt docs` to start the docs server. Run `wt remove` when finished; tethered servers stop with the worktree.
+
+## License
+
+MIT
