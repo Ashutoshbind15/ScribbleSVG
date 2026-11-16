@@ -155,7 +155,7 @@ export function DiagramCanvas({
     stepEditingFontSize,
     updateEditingLayout,
     updateEditingText,
-  } = useCanvasInteraction(state, dispatch, svgRef, size, catalog.valid);
+  } = useCanvasInteraction(state, dispatch, svgRef, catalog.valid);
 
   const [helpOpen, setHelpOpen] = useState(false);
   // Detected after mount so server and first client render agree.

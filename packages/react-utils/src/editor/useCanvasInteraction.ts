@@ -209,10 +209,9 @@ export function useCanvasInteraction(
   state: CanvasState,
   dispatch: React.Dispatch<CanvasAction>,
   svgRef: React.RefObject<SVGSVGElement | null>,
-  containerSize: { width: number; height: number },
   icons?: DiagramIcon[],
 ) {
-  const { document: doc, selectedIds, tool, activeIconId } = state;
+  const { document: doc, selectedIds, tool, activeIconId, size: canvasSize } = state;
   const elements = doc.elements;
   const viewport = doc.viewport;
 
@@ -431,10 +430,10 @@ export function useCanvasInteraction(
         e.clientX - rect.left,
         e.clientY - rect.top,
         viewport,
-        containerSize,
+        canvasSize,
       );
     },
-    [svgRef, viewport, containerSize],
+    [svgRef, viewport, canvasSize],
   );
 
   // ── Open inline text editor for an element ──
@@ -921,14 +920,14 @@ export function useCanvasInteraction(
         e.clientX - rect.left,
         e.clientY - rect.top,
         viewport,
-        containerSize,
+        canvasSize,
       );
 
       e.preventDefault();
       e.stopPropagation();
       createTextAt(canvasPoint);
     },
-    [svgRef, viewport, containerSize, tool, createTextAt, editingTarget],
+    [svgRef, viewport, canvasSize, tool, createTextAt, editingTarget],
   );
 
   // ── Pointer move on SVG: continue the active gesture, or update hover feedback ──
