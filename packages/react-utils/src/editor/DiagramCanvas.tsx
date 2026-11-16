@@ -96,20 +96,13 @@ export function DiagramCanvas({
   autoFocus = false,
   fitOnLoad = false,
 }: DiagramCanvasProps) {
-  const [state, dispatch] = useCanvasReducer(initialDocument);
+  const [state, dispatch] = useCanvasReducer(initialDocument, { fitOnLoad });
   const svgRef = useRef<SVGSVGElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const catalog = useMemo(() => partitionIconCatalog(icons), [icons]);
-
-  // Container dimensions for viewBox computation
-  const [size, setSize] = useState({ width: 800, height: 600 });
-
-  /** fitOnLoad waits for the first real measurement (the default is a guess). */
-  const fitPendingRef = useRef(fitOnLoad);
-  const elementsRef = useRef(state.document.elements);
-  elementsRef.current = state.document.elements;
+  const { size } = state;
 
   // ── Resize observer ──
   useEffect(() => {
@@ -119,21 +112,8 @@ export function DiagramCanvas({
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
-        const measured = {
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        };
-        setSize(measured);
-        if (fitPendingRef.current && measured.width > 0 && measured.height > 0) {
-          fitPendingRef.current = false;
-          dispatch({
-            type: "SET_VIEWPORT",
-            viewport: fitViewport(
-              getContentBounds(elementsRef.current),
-              measured,
-            ),
-          });
-        }
+        const { width, height } = entry.contentRect;
+        dispatch({ type: "RESIZE", size: { width, height } });
       }
     });
     observer.observe(container);

@@ -222,6 +222,8 @@ function createCanvasState(
     past: [],
     future: [],
     historyBatchDepth: 0,
+    size: { width: 800, height: 600 },
+    fitPending: false,
   };
 }
 

@@ -33,6 +33,10 @@ Zoom controls in the editor:
 - `fitViewport`, `MIN_ZOOM` and `MAX_ZOOM` are exported from `@scribblesvg/react-utils/editor`
 - The "Skipped invalid icons" notice moved to the bottom-left of the canvas, clear of the zoom card
 
+Editor state in one place (no change for `DiagramCanvas` users):
+
+- The canvas size is reducer state: `CanvasState` has `size` and `fitPending`, and the new `RESIZE` action sets the size (and fits the content on the first one when `fitPending`). `useCanvasReducer(document, { fitOnLoad })` sets `fitPending`
+
 ## 0.2.3 / 0.2.6
 
 Editor and geometry improvements:

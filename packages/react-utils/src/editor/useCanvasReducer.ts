@@ -1,10 +1,12 @@
 import { useReducer } from "react";
 import {
   EMPTY_DOCUMENT,
+  getContentBounds,
   type DiagramDocument,
   type DiagramElement,
   type Viewport,
 } from "@scribblesvg/core";
+import { fitViewport } from "./zoom";
 
 // ── Tool types ──
 
@@ -44,6 +46,10 @@ export interface CanvasState {
    * Use BEGIN_HISTORY / END_HISTORY to group a gesture into one undo step.
    */
   historyBatchDepth: number;
+  /** Canvas size in screen pixels. A guess until the first `RESIZE`. */
+  size: { width: number; height: number };
+  /** Fit the content to the first non-empty `RESIZE` (the `fitOnLoad` prop). */
+  fitPending: boolean;
 }
 
 // ── Actions ──
@@ -52,6 +58,7 @@ export type CanvasAction =
   | { type: "SET_DOCUMENT"; document: DiagramDocument }
   | { type: "SET_TOOL"; tool: ToolType; activeIconId?: string | null }
   | { type: "SET_VIEWPORT"; viewport: Viewport }
+  | { type: "RESIZE"; size: { width: number; height: number } }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
   | {
       type: "ADD_ELEMENTS";
@@ -156,6 +163,25 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
         ...state,
         document: { ...state.document, viewport: action.viewport },
       };
+
+    case "RESIZE": {
+      const { size } = action;
+      if (state.fitPending && size.width > 0 && size.height > 0) {
+        return {
+          ...state,
+          size,
+          fitPending: false,
+          document: {
+            ...state.document,
+            viewport: fitViewport(getContentBounds(state.document.elements), size),
+          },
+        };
+      }
+      if (size.width === state.size.width && size.height === state.size.height) {
+        return state;
+      }
+      return { ...state, size };
+    }
 
     case "ADD_ELEMENT":
       return withHistory(state, {
@@ -310,12 +336,22 @@ const INITIAL_STATE: CanvasState = {
   past: [],
   future: [],
   historyBatchDepth: 0,
+  size: { width: 800, height: 600 },
+  fitPending: false,
 };
 
-export function useCanvasReducer(initialDoc?: DiagramDocument) {
+/**
+ * Editor state for `initialDoc`. With `fitOnLoad`, the first real canvas
+ * size (`RESIZE`) also frames the document's content.
+ */
+export function useCanvasReducer(
+  initialDoc?: DiagramDocument,
+  { fitOnLoad = false }: { fitOnLoad?: boolean } = {},
+) {
   return useReducer(canvasReducer, {
     ...INITIAL_STATE,
     document: initialDoc ?? EMPTY_DOCUMENT,
+    fitPending: fitOnLoad,
   });
 }
 
