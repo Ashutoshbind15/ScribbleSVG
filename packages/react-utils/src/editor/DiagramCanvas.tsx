@@ -3,6 +3,7 @@ import { RedoIcon, UndoIcon } from "./toolbarIcons";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
+  getContentBounds,
   getElementBounds,
   generateSeed,
   isConnector,
@@ -37,10 +38,10 @@ import { useHeldModifiers } from "./useHeldModifiers";
 import { measureDomTextSize } from "./measureDomText";
 import { useCanvasInteraction } from "./useCanvasInteraction";
 import { partitionIconCatalog, type DiagramIcon } from "../icons";
+import { ZoomControls } from "./ZoomControls";
+import { fitViewport, stepZoom, zoomAround } from "./zoom";
 
-// ── Zoom limits ──
-const MIN_ZOOM = 0.1;
-const MAX_ZOOM = 5;
+// ── Wheel zoom sensitivity ──
 /** Trackpad pinch (browser sets ctrlKey without a physical Ctrl press). */
 const PINCH_ZOOM_SENSITIVITY = 0.016;
 /** Physical Ctrl/Cmd + scroll — scroll deltas are large, so keep this low. */
@@ -74,6 +75,12 @@ export interface DiagramCanvasProps {
    * Shortcuts only reach the editor while focus is inside it.
    */
   autoFocus?: boolean;
+  /**
+   * On mount, once the canvas has a size, frame the initial document's
+   * content (never zooming in past 100%). Off by default: the document's
+   * saved viewport is kept.
+   */
+  fitOnLoad?: boolean;
 }
 
 /**
@@ -87,6 +94,7 @@ export function DiagramCanvas({
   onRequestImage,
   className,
   autoFocus = false,
+  fitOnLoad = false,
 }: DiagramCanvasProps) {
   const [state, dispatch] = useCanvasReducer(initialDocument);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -98,6 +106,11 @@ export function DiagramCanvas({
   // Container dimensions for viewBox computation
   const [size, setSize] = useState({ width: 800, height: 600 });
 
+  /** fitOnLoad waits for the first real measurement (the default is a guess). */
+  const fitPendingRef = useRef(fitOnLoad);
+  const elementsRef = useRef(state.document.elements);
+  elementsRef.current = state.document.elements;
+
   // ── Resize observer ──
   useEffect(() => {
     const container = containerRef.current;
@@ -106,15 +119,26 @@ export function DiagramCanvas({
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
-        setSize({
+        const measured = {
           width: entry.contentRect.width,
           height: entry.contentRect.height,
-        });
+        };
+        setSize(measured);
+        if (fitPendingRef.current && measured.width > 0 && measured.height > 0) {
+          fitPendingRef.current = false;
+          dispatch({
+            type: "SET_VIEWPORT",
+            viewport: fitViewport(
+              getContentBounds(elementsRef.current),
+              measured,
+            ),
+          });
+        }
       }
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [dispatch]);
 
   // ── Notify parent of document changes ──
   useEffect(() => {
@@ -163,6 +187,15 @@ export function DiagramCanvas({
     setIsApple(isApplePlatform());
   }, []);
 
+  // ── Zoom commands (slider, buttons, keys): around the viewport centre ──
+  const viewport = state.document.viewport;
+  const setViewport = (next: typeof viewport) =>
+    dispatch({ type: "SET_VIEWPORT", viewport: next });
+  const zoomToCentre = (zoom: number) => setViewport(zoomAround(viewport, zoom));
+  const zoomToFit = () =>
+    setViewport(fitViewport(getContentBounds(state.document.elements), size));
+  const resetZoom = () => zoomToCentre(1);
+
   const runCommand = (command: Command): boolean => {
     switch (command.type) {
       case "undo":
@@ -202,6 +235,15 @@ export function DiagramCanvas({
       case "snapHold":
       case "snapRelease":
         setShiftSnap(command.type === "snapHold");
+        return true;
+      case "zoomStep":
+        zoomToCentre(stepZoom(viewport.zoom, command.direction));
+        return true;
+      case "zoomFit":
+        zoomToFit();
+        return true;
+      case "zoomReset":
+        resetZoom();
         return true;
     }
   };
@@ -342,7 +384,8 @@ export function DiagramCanvas({
       const pointerScreenX = e.clientX - rect.left;
       const pointerScreenY = e.clientY - rect.top;
 
-      const canvasBefore = screenToCanvas(
+      // The canvas point under the cursor stays under it.
+      const anchor = screenToCanvas(
         pointerScreenX,
         pointerScreenY,
         viewport,
@@ -355,28 +398,11 @@ export function DiagramCanvas({
           : e.deltaMode === 2
             ? e.deltaY * 800
             : e.deltaY;
-      const newZoom = Math.min(
-        MAX_ZOOM,
-        Math.max(
-          MIN_ZOOM,
-          viewport.zoom * Math.exp(-rawDelta * sensitivity),
-        ),
-      );
-
-      const canvasAfter = screenToCanvas(
-        pointerScreenX,
-        pointerScreenY,
-        { ...viewport, zoom: newZoom },
-        { width: currentSize.width, height: currentSize.height },
-      );
+      const newZoom = viewport.zoom * Math.exp(-rawDelta * sensitivity);
 
       dispatchRef.current({
         type: "SET_VIEWPORT",
-        viewport: {
-          x: viewport.x + (canvasBefore.x - canvasAfter.x),
-          y: viewport.y + (canvasBefore.y - canvasAfter.y),
-          zoom: newZoom,
-        },
+        viewport: zoomAround(viewport, newZoom, anchor),
       });
     };
 
@@ -563,9 +589,6 @@ export function DiagramCanvas({
           onOpenChange={setHelpOpen}
           isApple={isApple}
         />
-        <span className="scribblesvg-editor__zoom">
-          {Math.round(state.document.viewport.zoom * 100)}%
-        </span>
       </div>
 
       <div
@@ -665,6 +688,13 @@ export function DiagramCanvas({
           {/* Drag-to-resize grip for label / edited text */}
           {textSizeGrip}
         </svg>
+
+        <ZoomControls
+          zoom={viewport.zoom}
+          onZoomChange={zoomToCentre}
+          onFit={zoomToFit}
+          onReset={resetZoom}
+        />
 
         {catalog.warnings.length > 0 && (
           <div

@@ -35,7 +35,11 @@ export type Command =
   | { type: "panHold" }
   | { type: "panRelease" }
   | { type: "snapHold" }
-  | { type: "snapRelease" };
+  | { type: "snapRelease" }
+  /** Next zoom preset up (1) or down (-1), around the viewport centre. */
+  | { type: "zoomStep"; direction: 1 | -1 }
+  | { type: "zoomFit" }
+  | { type: "zoomReset" };
 
 /**
  * "ifHandled": only when the command did something, so Ctrl+C with nothing
@@ -56,6 +60,9 @@ const PREVENT_DEFAULT: Record<Command["type"], boolean | "ifHandled"> = {
   panRelease: false,
   snapHold: false,
   snapRelease: false,
+  zoomStep: true,
+  zoomFit: true,
+  zoomReset: true,
 };
 
 export interface HelpRow {
@@ -95,6 +102,24 @@ function modLetter(
     modChord(e, ctx) && e.key.toLowerCase() === letter ? command : null;
 }
 
+/**
+ * Shift + a digit key, matched by code: Shift+1 types "!" (or another glyph)
+ * depending on the layout. Off while text is edited, like other canvas keys.
+ */
+function shiftDigit(
+  digit: string,
+  command: Command,
+): (e: KeyEventLike, ctx: ShortcutContext) => Command | null {
+  return (e, ctx) =>
+    !isKeyUp(e) &&
+    !ctx.editingText &&
+    e.shiftKey &&
+    !(e.metaKey || e.ctrlKey || e.altKey) &&
+    e.code === `Digit${digit}`
+      ? command
+      : null;
+}
+
 function isQuestionMark(e: KeyEventLike): boolean {
   if (e.metaKey || e.ctrlKey || e.altKey) return false;
   return e.key === "?" || (e.key === "/" && e.shiftKey);
@@ -109,6 +134,27 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   { id: "zoom-pinch", help: { label: "Zoom (trackpad)", keys: () => ["Pinch"] } },
   { id: "zoom-ctrl-scroll", help: { label: "Zoom (fine)", keys: () => ["Ctrl", "scroll"] } },
   { id: "zoom-wheel", help: { label: "Zoom (mouse)", keys: () => ["Scroll wheel"] } },
+  {
+    id: "zoom-step",
+    help: { label: "Zoom in / out", keys: (a) => [modLabel(a), "+"], altKeys: () => ["-"] },
+    // By key: "+" and "=" share a key on US layouts but not on all others.
+    resolve: (e, ctx) => {
+      if (!modChord(e, ctx)) return null;
+      if (e.key === "=" || e.key === "+") return { type: "zoomStep", direction: 1 };
+      if (e.key === "-" || e.key === "_") return { type: "zoomStep", direction: -1 };
+      return null;
+    },
+  },
+  {
+    id: "zoom-fit",
+    help: { label: "Zoom to fit", keys: () => ["Shift", "1"] },
+    resolve: shiftDigit("1", { type: "zoomFit" }),
+  },
+  {
+    id: "zoom-reset",
+    help: { label: "Zoom to 100%", keys: () => ["Shift", "0"] },
+    resolve: shiftDigit("0", { type: "zoomReset" }),
+  },
   {
     id: "pan-space",
     help: { label: "Pan canvas", keys: () => ["Space", "drag"] },

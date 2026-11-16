@@ -112,6 +112,58 @@ test("fontStep: Ctrl/Cmd+Shift+Period/Comma by code", () => {
   assert.equal(resolveShortcut(key(">", "Period", { shiftKey: true }), ctx()), null);
 });
 
+test("zoom to fit and reset: Shift+1 / Shift+0 by code, whatever the glyph", () => {
+  const fit = { type: "zoomFit" };
+  const reset = { type: "zoomReset" };
+  // US layout: Shift+1 types "!", Shift+0 types ")"
+  assert.deepEqual(resolveShortcut(key("!", "Digit1", { shiftKey: true }), ctx()), fit);
+  assert.deepEqual(resolveShortcut(key(")", "Digit0", { shiftKey: true }), ctx()), reset);
+  // Other layouts (e.g. AZERTY types the digit itself with Shift)
+  assert.deepEqual(resolveShortcut(key("1", "Digit1", { shiftKey: true }), ctx()), fit);
+  assert.deepEqual(resolveShortcut(key("=", "Digit0", { shiftKey: true }), selected), reset);
+  // On the canvas they block the browser default
+  assert.deepEqual(press(key("!", "Digit1", { shiftKey: true }), ctx()), { ran: [fit], prevented: true });
+  assert.deepEqual(press(key(")", "Digit0", { shiftKey: true }), ctx()), { ran: [reset], prevented: true });
+
+  // Needs Shift, and no command modifier
+  assert.equal(resolveShortcut(key("1", "Digit1"), ctx()), null);
+  assert.equal(resolveShortcut(key("!", "Digit1", { shiftKey: true, ...ctrl }), ctx()), null);
+  assert.equal(resolveShortcut(key("!", "Digit1", { shiftKey: true, ...cmd }), apple), null);
+  assert.equal(resolveShortcut(key("!", "Digit1", { shiftKey: true, altKey: true }), ctx()), null);
+  // The numpad and other digits aren't bound
+  assert.equal(resolveShortcut(key("End", "Numpad1", { shiftKey: true }), ctx()), null);
+  assert.equal(resolveShortcut(key("@", "Digit2", { shiftKey: true }), ctx()), null);
+  // Keydown only
+  assert.equal(
+    resolveShortcut(key("!", "Digit1", { shiftKey: true, type: "keyup" }), ctx()),
+    null,
+  );
+});
+
+test("zoom in / out: Ctrl/Cmd with = or +, and -", () => {
+  const zoomIn = { type: "zoomStep", direction: 1 };
+  const zoomOut = { type: "zoomStep", direction: -1 };
+  assert.deepEqual(resolveShortcut(key("=", "Equal", ctrl), ctx()), zoomIn);
+  assert.deepEqual(resolveShortcut(key("+", "Equal", { ...ctrl, shiftKey: true }), ctx()), zoomIn);
+  assert.deepEqual(resolveShortcut(key("+", "NumpadAdd", ctrl), ctx()), zoomIn);
+  assert.deepEqual(resolveShortcut(key("=", "Equal", cmd), apple), zoomIn);
+  assert.deepEqual(resolveShortcut(key("-", "Minus", ctrl), ctx()), zoomOut);
+  assert.deepEqual(resolveShortcut(key("_", "Minus", { ...ctrl, shiftKey: true }), ctx()), zoomOut);
+  assert.deepEqual(resolveShortcut(key("-", "NumpadSubtract", ctrl), ctx()), zoomOut);
+  assert.deepEqual(resolveShortcut(key("-", "Minus", cmd), apple), zoomOut);
+  // Held chord keeps stepping, like the browser's page zoom
+  assert.deepEqual(resolveShortcut(key("=", "Equal", { ...ctrl, repeat: true }), ctx()), zoomIn);
+  // On the canvas they block the browser's page zoom
+  assert.deepEqual(press(key("=", "Equal", ctrl), ctx()), { ran: [zoomIn], prevented: true });
+  assert.deepEqual(press(key("-", "Minus", ctrl), ctx()), { ran: [zoomOut], prevented: true });
+
+  // Needs the mod key, and no Alt
+  assert.equal(resolveShortcut(key("=", "Equal"), ctx()), null);
+  assert.equal(resolveShortcut(key("-", "Minus"), ctx()), null);
+  assert.equal(resolveShortcut(key("=", "Equal", { ...ctrl, altKey: true }), ctx()), null);
+  assert.equal(resolveShortcut(key("0", "Digit0", ctrl), ctx()), null);
+});
+
 test("Escape cancels the gesture; with the panel open it also closes the panel", () => {
   assert.deepEqual(resolveShortcut(key("Escape", "Escape"), ctx()), { type: "cancelGesture" });
 
@@ -177,6 +229,10 @@ test("while text is edited only the help keys and releases resolve", () => {
     key(" ", "Space"),
     key("Shift", "ShiftLeft", { shiftKey: true }),
     key(">", "Period", { ...ctrl, shiftKey: true }),
+    key("!", "Digit1", { shiftKey: true }),
+    key(")", "Digit0", { shiftKey: true }),
+    key("=", "Equal", ctrl),
+    key("-", "Minus", ctrl),
   ]) {
     assert.equal(resolveShortcut(event, editing), null, event.code);
   }
@@ -258,7 +314,7 @@ interface Row {
 const row = (label: string, keys: string[], altKeys?: string[]): Row =>
   altKeys ? { label, keys, altKeys } : { label, keys };
 
-/** The panel's rows before the keymap existed, verbatim. */
+/** The panel's rows before the keymap existed, verbatim, plus the zoom keys. */
 function previousRows(isApple: boolean): Row[] {
   const mod = isApple ? "⌘" : "Ctrl";
   return [
@@ -266,6 +322,9 @@ function previousRows(isApple: boolean): Row[] {
     row("Zoom (trackpad)", ["Pinch"]),
     row("Zoom (fine)", ["Ctrl", "scroll"]),
     row("Zoom (mouse)", ["Scroll wheel"]),
+    row("Zoom in / out", [mod, "+"], ["-"]),
+    row("Zoom to fit", ["Shift", "1"]),
+    row("Zoom to 100%", ["Shift", "0"]),
     row("Pan canvas", ["Space", "drag"]),
     row("Multi-select", ["Shift", "click"]),
     row("Box select", ["Drag empty"]),
