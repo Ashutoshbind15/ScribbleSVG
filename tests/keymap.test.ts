@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  PREVENT_DEFAULT,
+  handleShortcutKey,
   helpRows,
   isButtonLike,
   isTextEntry,
   resolveShortcut,
   targetOwnsKey,
   type KeyEventLike,
+  type Command,
   type KeyTargetLike,
   type ShortcutContext,
 } from "../packages/react-utils/src/editor/keymap.ts";
@@ -71,18 +72,15 @@ test("copy, cut, paste", () => {
   // Copy resolves without a selection; the handler decides preventDefault
   assert.deepEqual(resolveShortcut(key("c", "KeyC", ctrl), ctx()), { type: "copy" });
   assert.deepEqual(resolveShortcut(key("c", "KeyC", cmd), apple), { type: "copy" });
-  assert.equal(PREVENT_DEFAULT.copy, "ifHandled");
 
   // Cut needs a selection, so page cut still works otherwise
   assert.deepEqual(resolveShortcut(key("x", "KeyX", ctrl), selected), { type: "cut" });
   assert.equal(resolveShortcut(key("x", "KeyX", ctrl), ctx()), null);
-  assert.equal(PREVENT_DEFAULT.cut, true);
 
   assert.deepEqual(resolveShortcut(key("v", "KeyV", ctrl), ctx()), { type: "paste" });
   assert.deepEqual(resolveShortcut(key("V", "KeyV", { ...cmd, shiftKey: true }), apple), {
     type: "paste",
   });
-  assert.equal(PREVENT_DEFAULT.paste, true);
 
   assert.equal(resolveShortcut(key("c", "KeyC"), ctx()), null);
   assert.equal(resolveShortcut(key("v", "KeyV", { ...ctrl, altKey: true }), ctx()), null);
@@ -96,7 +94,6 @@ test("delete: Delete or Backspace with a selection", () => {
     { type: "delete" },
   );
   assert.equal(resolveShortcut(key("Delete", "Delete"), ctx()), null);
-  assert.equal(PREVENT_DEFAULT.delete, true);
 });
 
 test("fontStep: Ctrl/Cmd+Shift+Period/Comma by code", () => {
@@ -117,13 +114,11 @@ test("fontStep: Ctrl/Cmd+Shift+Period/Comma by code", () => {
 
 test("Escape cancels the gesture; with the panel open it also closes the panel", () => {
   assert.deepEqual(resolveShortcut(key("Escape", "Escape"), ctx()), { type: "cancelGesture" });
-  assert.equal(PREVENT_DEFAULT.cancelGesture, false);
 
   assert.deepEqual(resolveShortcut(key("Escape", "Escape"), ctx({ helpOpen: true })), {
     type: "closeHelp",
     cancelGesture: true,
   });
-  assert.equal(PREVENT_DEFAULT.closeHelp, true);
 
   // The panel ignores Escape with a command modifier; the gesture still cancels
   assert.deepEqual(
@@ -148,12 +143,10 @@ test("? toggles the help panel, without command modifiers", () => {
 
 test("Space-pan and Shift-snap hold on keydown and release on keyup", () => {
   assert.deepEqual(resolveShortcut(key(" ", "Space"), ctx()), { type: "panHold" });
-  assert.equal(PREVENT_DEFAULT.panHold, true);
   assert.equal(resolveShortcut(key(" ", "Space", { repeat: true }), ctx()), null);
   assert.deepEqual(resolveShortcut(key(" ", "Space", { type: "keyup" }), ctx()), {
     type: "panRelease",
   });
-  assert.equal(PREVENT_DEFAULT.panRelease, false);
 
   assert.deepEqual(resolveShortcut(key("Shift", "ShiftLeft", { shiftKey: true }), ctx()), {
     type: "snapHold",
@@ -165,7 +158,6 @@ test("Space-pan and Shift-snap hold on keydown and release on keyup", () => {
   assert.deepEqual(resolveShortcut(key("Shift", "ShiftRight", { type: "keyup" }), ctx()), {
     type: "snapRelease",
   });
-  assert.equal(PREVENT_DEFAULT.snapHold, false);
 });
 
 test("keyup only releases held keys", () => {
@@ -303,4 +295,72 @@ test("help panel shows the same rows as before, per platform", () => {
 test("help rows have unique ids", () => {
   const ids = helpRows(false).map((row) => row.id);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+function press(
+  k: KeyEventLike,
+  context: ShortcutContext,
+  { from = target("DIV"), handled = true }: { from?: KeyTargetLike; handled?: boolean } = {},
+) {
+  const ran: Command[] = [];
+  let prevented = false;
+  handleShortcutKey(
+    { ...k, target: from, preventDefault: () => { prevented = true; } },
+    context,
+    (command) => {
+      ran.push(command);
+      return handled;
+    },
+  );
+  return { ran, prevented };
+}
+
+test("a shortcut on the canvas runs and blocks the browser default", () => {
+  assert.deepEqual(press(key("z", "KeyZ", ctrl), ctx()), { ran: [{ type: "undo" }], prevented: true });
+  assert.deepEqual(press(key("Backspace", "Backspace"), selected), {
+    ran: [{ type: "delete" }],
+    prevented: true,
+  });
+});
+
+test("copy blocks the browser default only when it copied something", () => {
+  assert.deepEqual(press(key("c", "KeyC", ctrl), selected, { handled: true }), {
+    ran: [{ type: "copy" }],
+    prevented: true,
+  });
+  assert.deepEqual(press(key("c", "KeyC", ctrl), ctx(), { handled: false }), {
+    ran: [{ type: "copy" }],
+    prevented: false,
+  });
+});
+
+test("Escape cancels the gesture and leaves the browser default alone", () => {
+  assert.deepEqual(press(key("Escape", "Escape"), ctx()), {
+    ran: [{ type: "cancelGesture" }],
+    prevented: false,
+  });
+});
+
+test("keys typed in a text field never reach the editor", () => {
+  for (const k of [key("Backspace", "Backspace"), key("z", "KeyZ", ctrl), key(" ", "Space")]) {
+    assert.deepEqual(press(k, selected, { from: target("INPUT") }), { ran: [], prevented: false });
+  }
+});
+
+test("Space on a button presses the button; other shortcuts still run there", () => {
+  assert.deepEqual(press(key(" ", "Space"), ctx(), { from: target("BUTTON") }), {
+    ran: [],
+    prevented: false,
+  });
+  assert.deepEqual(press(key("Delete", "Delete"), selected, { from: target("BUTTON") }), {
+    ran: [{ type: "delete" }],
+    prevented: true,
+  });
+});
+
+test("releasing Space ends panning even from a text field, without blocking it", () => {
+  assert.deepEqual(press(key(" ", "Space", { type: "keyup" }), ctx(), { from: target("INPUT") }), {
+    ran: [{ type: "panRelease" }],
+    prevented: false,
+  });
 });

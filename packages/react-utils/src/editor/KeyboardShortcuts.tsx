@@ -9,15 +9,9 @@ function renderKeys(keys: string[], idPrefix: string) {
 interface KeyboardShortcutsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Shows ⌘ instead of Ctrl, and leaves out Ctrl+Y redo. */
   isApple: boolean;
 }
 
-/**
- * Keyboard-shortcuts helper for the canvas header. Controlled: the editor
- * root owns `open` so its key handler can toggle it with `?` and close it
- * with Escape. Rows come from the keymap, so they can't drift from the keys.
- */
 export function KeyboardShortcuts({
   open,
   onOpenChange,

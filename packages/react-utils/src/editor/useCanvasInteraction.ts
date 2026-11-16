@@ -202,9 +202,8 @@ interface MarqueeState {
  * - Arrow creation (two-click)
  * - Click a selected element again to edit its text; double-click adds free text
  *
- * Keys are not listened for here: the editor root resolves them through
- * `keymap.ts` and calls the commands this hook returns (delete, clipboard,
- * font step, Escape, Space-pan, Shift-snap).
+ * Keys aren't handled here. DiagramCanvas wires the returned commands to its
+ * key handler.
  */
 export function useCanvasInteraction(
   state: CanvasState,
@@ -407,9 +406,7 @@ export function useCanvasInteraction(
     [elements, selectedIds, dispatch],
   );
 
-  // ── Keyboard commands (run by the editor root's key handler) ──
 
-  /** Escape: drop the arrow being placed and the box-selection preview. */
   const cancelGesture = useCallback(() => {
     cancelArrow();
     // Pointer-up still ends the gesture and releases capture.
@@ -419,10 +416,6 @@ export function useCanvasInteraction(
     }
   }, [cancelArrow]);
 
-  /**
-   * Ends Space-pan and the Shift snap preview. Called when focus leaves the
-   * editor, since the keyup for a held key then goes elsewhere.
-   */
   const releaseHeldKeys = useCallback(() => {
     setSpaceHeld(false);
     updateConnectorPreviewForShift(false);
@@ -1128,7 +1121,6 @@ export function useCanvasInteraction(
     marqueeBounds,
     spaceHeld,
     handleSize: HANDLE_SIZE,
-    // Keyboard commands
     handleDelete,
     handleCopy,
     handleCut,

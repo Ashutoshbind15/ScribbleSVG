@@ -1,12 +1,4 @@
-/**
- * The editor's single definition of keyboard shortcuts: which key runs which
- * command, which keys the focused element keeps, and the help panel rows.
- * Pure (no DOM), so tests drive it with plain objects.
- */
-
-/** The parts of a keyboard event the keymap reads (a React or DOM event fits). */
 export interface KeyEventLike {
-  /** "keydown" or "keyup". */
   type: string;
   key: string;
   code: string;
@@ -17,10 +9,8 @@ export interface KeyEventLike {
   repeat: boolean;
 }
 
-/** Editor state a key's meaning depends on. */
 export interface ShortcutContext {
   hasSelection: boolean;
-  /** The inline text editor is open. */
   editingText: boolean;
   helpOpen: boolean;
   /** macOS / iOS: ⌘ is the command key and Ctrl+Y is not redo. */
@@ -35,7 +25,6 @@ export type Command =
   | { type: "paste" }
   | { type: "delete" }
   | { type: "fontStep"; direction: 1 | -1 }
-  /** Drop the arrow being placed and the box-selection preview. */
   | { type: "cancelGesture" }
   | { type: "toggleHelp" }
   /**
@@ -48,14 +37,11 @@ export type Command =
   | { type: "snapHold" }
   | { type: "snapRelease" };
 
-export type CommandType = Command["type"];
-
 /**
- * When the root handler calls preventDefault. "ifHandled": only when the
- * command reports it did something, so Ctrl+C with nothing selected still
- * copies page text.
+ * "ifHandled": only when the command did something, so Ctrl+C with nothing
+ * selected still copies page text.
  */
-export const PREVENT_DEFAULT: Record<CommandType, boolean | "ifHandled"> = {
+const PREVENT_DEFAULT: Record<Command["type"], boolean | "ifHandled"> = {
   undo: true,
   redo: true,
   copy: "ifHandled",
@@ -72,7 +58,6 @@ export const PREVENT_DEFAULT: Record<CommandType, boolean | "ifHandled"> = {
   snapRelease: false,
 };
 
-/** One row of the help panel. */
 export interface HelpRow {
   id: string;
   label: string;
@@ -96,17 +81,12 @@ interface ShortcutDef {
 const modLabel = (isApple: boolean) => (isApple ? "⌘" : "Ctrl");
 const isKeyUp = (e: KeyEventLike) => e.type === "keyup";
 
-/**
- * Ctrl/Cmd chord (no Alt) on keydown. Canvas commands are off while the
- * inline text editor is open; the textarea handles its own keys.
- */
 function modChord(e: KeyEventLike, ctx: ShortcutContext): boolean {
   return (
     !isKeyUp(e) && !ctx.editingText && (e.metaKey || e.ctrlKey) && !e.altKey
   );
 }
 
-/** Ctrl/Cmd + `letter`, any Shift state (case-insensitive key). */
 function modLetter(
   letter: string,
   command: Command,
@@ -115,7 +95,6 @@ function modLetter(
     modChord(e, ctx) && e.key.toLowerCase() === letter ? command : null;
 }
 
-/** Help-panel key `?`, typed with no command modifier. */
 function isQuestionMark(e: KeyEventLike): boolean {
   if (e.metaKey || e.ctrlKey || e.altKey) return false;
   return e.key === "?" || (e.key === "/" && e.shiftKey);
@@ -133,7 +112,6 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   {
     id: "pan-space",
     help: { label: "Pan canvas", keys: () => ["Space", "drag"] },
-    // Held state: press starts it, release (always honoured) ends it.
     resolve: (e, ctx) => {
       if (e.code !== "Space") return null;
       if (isKeyUp(e)) return { type: "panRelease" };
@@ -248,7 +226,6 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   },
 ];
 
-/** The command `event` runs in `ctx`, or null when the editor ignores it. */
 export function resolveShortcut(
   event: KeyEventLike,
   ctx: ShortcutContext,
@@ -260,7 +237,6 @@ export function resolveShortcut(
   return null;
 }
 
-/** Help panel rows for the platform, from the same table the keys use. */
 export function helpRows(isApple: boolean): HelpRow[] {
   const rows: HelpRow[] = [];
   for (const { id, help } of SHORTCUTS) {
@@ -276,7 +252,6 @@ export function helpRows(isApple: boolean): HelpRow[] {
   return rows;
 }
 
-/** Best-effort Apple platform check; false outside a browser. */
 export function isApplePlatform(): boolean {
   const nav = (globalThis as {
     navigator?: { userAgent?: string; userAgentData?: { platform?: string } };
@@ -286,9 +261,6 @@ export function isApplePlatform(): boolean {
   return /mac|iphone|ipad|ipod/i.test(hint);
 }
 
-// ── Key ownership ──
-
-/** The parts of an event target the ownership rules read. */
 export interface KeyTargetLike {
   tagName?: string;
   isContentEditable?: boolean;
@@ -299,7 +271,6 @@ type KeyTarget = KeyTargetLike | EventTarget | null | undefined;
 
 const asTarget = (target: KeyTarget) => (target ?? {}) as KeyTargetLike;
 
-/** input, textarea, select, or contenteditable: typing goes to it. */
 export function isTextEntry(target: KeyTarget): boolean {
   const t = asTarget(target);
   const tag = t.tagName?.toUpperCase();
@@ -311,7 +282,6 @@ export function isTextEntry(target: KeyTarget): boolean {
   );
 }
 
-/** button or [role=button]: Space and Enter activate it. */
 export function isButtonLike(target: KeyTarget): boolean {
   const t = asTarget(target);
   return (
@@ -321,21 +291,45 @@ export function isButtonLike(target: KeyTarget): boolean {
 }
 
 /**
- * Keys the focused element keeps for itself. The editor never claims these.
- * First matching row wins; no row → the editor may claim any key.
+ * Keys the focused element keeps for itself. First matching row wins; no row
+ * means the editor may claim any key.
  */
 const TARGET_OWNS_KEYS: readonly {
-  name: string;
   match: (target: KeyTarget) => boolean;
   keys: "all" | readonly string[];
 }[] = [
-  { name: "text entry", match: isTextEntry, keys: "all" },
-  { name: "button", match: isButtonLike, keys: ["Space", "Enter"] },
+  { match: isTextEntry, keys: "all" },
+  { match: isButtonLike, keys: ["Space", "Enter"] },
 ];
 
-/** True when the element the key was typed in keeps `code` for itself. */
 export function targetOwnsKey(target: KeyTarget, code: string): boolean {
   const row = TARGET_OWNS_KEYS.find((r) => r.match(target));
   if (!row) return false;
   return row.keys === "all" || row.keys.includes(code);
+}
+
+export interface ShortcutKeyEvent extends KeyEventLike {
+  target: KeyTarget;
+  preventDefault(): void;
+}
+
+/**
+ * Runs the command for `event` and prevents the browser default when the
+ * editor took the key. `run` returns whether the command did anything.
+ */
+export function handleShortcutKey(
+  event: ShortcutKeyEvent,
+  ctx: ShortcutContext,
+  run: (command: Command) => boolean,
+): void {
+  // A release always runs: the key may have gone down on the canvas and come
+  // up after focus moved to a button.
+  if (!isKeyUp(event) && targetOwnsKey(event.target, event.code)) return;
+  const command = resolveShortcut(event, ctx);
+  if (!command) return;
+  const handled = run(command);
+  const prevent = PREVENT_DEFAULT[command.type];
+  if (prevent === true || (prevent === "ifHandled" && handled)) {
+    event.preventDefault();
+  }
 }

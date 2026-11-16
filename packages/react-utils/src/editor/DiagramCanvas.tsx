@@ -28,11 +28,9 @@ import { Toolbar } from "./Toolbar";
 import { TextSizeGrip } from "./TextSizeGrip";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import {
-  PREVENT_DEFAULT,
+  handleShortcutKey,
   isApplePlatform,
   isTextEntry,
-  resolveShortcut,
-  targetOwnsKey,
   type Command,
 } from "./keymap";
 import { useHeldModifiers } from "./useHeldModifiers";
@@ -93,7 +91,6 @@ export function DiagramCanvas({
   const [state, dispatch] = useCanvasReducer(initialDocument);
   const svgRef = useRef<SVGSVGElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  /** The viewport: the editor's focus target for shortcuts. */
   const containerRef = useRef<HTMLDivElement>(null);
 
   const catalog = useMemo(() => partitionIconCatalog(icons), [icons]);
@@ -140,7 +137,6 @@ export function DiagramCanvas({
     marqueeBounds,
     spaceHeld,
     handleSize,
-    // Keyboard commands
     handleDelete,
     handleCopy,
     handleCut,
@@ -160,7 +156,6 @@ export function DiagramCanvas({
     updateEditingText,
   } = useCanvasInteraction(state, dispatch, svgRef, size, catalog.valid);
 
-  // ── Keyboard: one handler on the root, resolved through keymap.ts ──
   const [helpOpen, setHelpOpen] = useState(false);
   // Detected after mount so server and first client render agree.
   const [isApple, setIsApple] = useState(false);
@@ -168,7 +163,6 @@ export function DiagramCanvas({
     setIsApple(isApplePlatform());
   }, []);
 
-  /** Runs `command`; the return value feeds PREVENT_DEFAULT's "ifHandled". */
   const runCommand = (command: Command): boolean => {
     switch (command.type) {
       case "undo":
@@ -212,31 +206,18 @@ export function DiagramCanvas({
     }
   };
 
-  const runKey = (e: React.KeyboardEvent) => {
-    const command = resolveShortcut(e, {
-      hasSelection: state.selectedIds.size > 0,
-      editingText: editingTarget !== null,
-      helpOpen,
-      isApple,
-    });
-    if (!command) return;
-    const handled = runCommand(command);
-    const prevent = PREVENT_DEFAULT[command.type];
-    if (prevent === true || (prevent === "ifHandled" && handled)) {
-      e.preventDefault();
-    }
-  };
+  const handleRootKey = (e: React.KeyboardEvent) =>
+    handleShortcutKey(
+      e,
+      {
+        hasSelection: state.selectedIds.size > 0,
+        editingText: editingTarget !== null,
+        helpOpen,
+        isApple,
+      },
+      runCommand,
+    );
 
-  const handleRootKeyDown = (e: React.KeyboardEvent) => {
-    if (targetOwnsKey(e.target, e.code)) return;
-    runKey(e);
-  };
-
-  // Releases skip the ownership check: a key held on the canvas may come up
-  // after focus moved to a button, and releasing never prevents default.
-  const handleRootKeyUp = runKey;
-
-  // ── Focus ──
   /**
    * Focus never comes from Tab here (presses, autoFocus, leaving the text
    * editor), so ask for no ring: Chrome otherwise shows :focus-visible for a
@@ -246,19 +227,12 @@ export function DiagramCanvas({
     containerRef.current?.focus({ preventScroll: true, focusVisible: false });
   }, []);
 
-  /** The inline text editor's textarea has focus. */
   const inlineEditorHasFocus = () => {
     const active = document.activeElement;
-    return (
-      isTextEntry(active) && !!active && !!rootRef.current?.contains(active)
-    );
+    return isTextEntry(active) && !!rootRef.current?.contains(active);
   };
 
-  /**
-   * One pointer rule: a press anywhere in the editor gives the canvas focus,
-   * unless it's on a text field. Capture phase, so a child's
-   * preventDefault/stopPropagation can't skip it.
-   */
+  // Capture phase, so a child's preventDefault/stopPropagation can't skip it.
   const handleRootPointerDownCapture = (e: React.PointerEvent) => {
     if (isTextEntry(e.target)) return;
     if (
@@ -277,7 +251,7 @@ export function DiagramCanvas({
     focusViewport();
   };
 
-  /** Stops the browser moving focus to toolbar buttons on press. */
+  // Keeps toolbar buttons from taking focus on press.
   const handleRootMouseDownCapture = (e: React.MouseEvent) => {
     if (!isTextEntry(e.target)) e.preventDefault();
   };
@@ -295,12 +269,10 @@ export function DiagramCanvas({
 
   const handleRootBlur = (e: React.FocusEvent) => {
     if (rootRef.current?.contains(e.relatedTarget as Node | null)) return;
-    // A lost keyup can't leave Space-pan or the Shift snap stuck on.
     releaseHeldKeys();
-    // Focus leaving the editor deselects, so nothing looks ready for keys it
-    // won't get. Checked after the event settles: closing the text editor
-    // drops focus for a moment before the canvas takes it back, and switching
-    // windows or tabs (document loses focus) keeps the selection.
+    // Checked after focus settles: closing the text editor drops focus for a
+    // moment before the canvas takes it back, and switching windows or tabs
+    // (document loses focus) keeps the selection.
     window.setTimeout(() => {
       const root = rootRef.current;
       if (!root || !document.hasFocus()) return;
@@ -550,8 +522,8 @@ export function DiagramCanvas({
     <div
       ref={rootRef}
       className={["scribblesvg-editor", className].filter(Boolean).join(" ")}
-      onKeyDown={handleRootKeyDown}
-      onKeyUp={handleRootKeyUp}
+      onKeyDown={handleRootKey}
+      onKeyUp={handleRootKey}
       onPointerDownCapture={handleRootPointerDownCapture}
       onMouseDownCapture={handleRootMouseDownCapture}
       onBlur={handleRootBlur}

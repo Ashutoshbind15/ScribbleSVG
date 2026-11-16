@@ -3,14 +3,9 @@ import { useEffect, useRef } from "react";
 const isZoomModKey = (key: string) => key === "Control" || key === "Meta";
 
 /**
- * Whether a physical Ctrl/Cmd key is held, as a ref for the wheel listener.
- *
- * Trackpad pinch arrives as wheel events with a synthetic ctrlKey and no
- * keydown, so this is how wheel zoom tells pinch from Ctrl+scroll.
- *
- * Unlike shortcuts, this listens on `window`: it only reads modifier state and
- * never calls preventDefault, so Ctrl+scroll over an unfocused canvas still
- * gets the Ctrl-zoom sensitivity rather than the pinch sensitivity.
+ * Trackpad pinch sends wheel events with a synthetic ctrlKey and no keydown,
+ * so a real Ctrl/Cmd keydown is how wheel zoom tells Ctrl+scroll from pinch.
+ * Listens on window so it works over an unfocused canvas; it only reads.
  */
 export function useHeldModifiers(): React.RefObject<boolean> {
   const modKeyHeld = useRef(false);
