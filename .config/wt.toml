@@ -1,0 +1,20 @@
+# Worktrunk project config
+# Isolated: worktree files, node_modules, and branch-specific app ports.
+# Shared: pnpm's content-addressable store. Ports use hash_port (10000–19999).
+# The first `wt switch --create` asks for hook approval.
+
+[pre-start]
+setup = "bash scripts/worktree/setup.sh"
+
+[post-start]
+site = "wt step tether -- pnpm --filter site exec vite --port {{ branch | hash_port }} --strictPort"
+playground = "wt step tether -- pnpm --filter playground exec vite --port {{ ('playground-' ~ branch) | hash_port }} --strictPort"
+
+[list]
+url = "http://localhost:{{ branch | hash_port }}"
+
+[aliases]
+dev = "wt step tether -- sh -c 'pnpm --filter site exec vite --port {{ branch | hash_port }} --strictPort & pnpm --filter playground exec vite --port {{ (\u0027playground-\u0027 ~ branch) | hash_port }} --strictPort & wait'"
+docs = "wt step tether -- pnpm --filter docs exec next dev --port {{ ('docs-' ~ branch) | hash_port }}"
+urls = "printf 'site %s\\nplayground %s\\ndocs %s\\n' http://localhost:{{ branch | hash_port }} http://localhost:{{ ('playground-' ~ branch) | hash_port }} http://localhost:{{ ('docs-' ~ branch) | hash_port }}"
+open = "python3 -c 'import webbrowser; webbrowser.open(\"http://localhost:{{ branch | hash_port }}\")'"
