@@ -24,6 +24,16 @@ Keyboard shortcuts are scoped to the focused editor:
 - **Breaking for direct `useCanvasInteraction` users:** the hook no longer listens for keys. It returns the commands (`handleDelete`, `handleCopy`, `handleCut`, `handlePaste`, `stepSelectionFontSize`, `cancelGesture`, `setSpaceHeld`, `setShiftSnap`, `releaseHeldKeys`) for your own key handler; `DiagramCanvas` wires them up for you
 - Ctrl+Y no longer redoes on macOS (use ⌘⇧Z), matching the shortcuts panel
 
+Zoom controls in the editor:
+
+- A zoom card in the bottom-right of the canvas replaces the zoom % in the header: a log-scale slider (10–500%, soft stop at 100%), **Zoom to fit**, and a reset button that shows the live % and is highlighted when zoom isn't 100%
+- New keys while the editor has focus: Ctrl/⌘ + `+`/`-` step through 10, 25, 50, 75, 100, 150, 200, 300, 400, 500%; Shift+1 zooms to fit; Shift+0 resets to 100%
+- Zoom to fit frames all content and never zooms in past 100%
+- New `fitOnLoad` prop on `DiagramCanvas` frames the initial document on mount (default keeps the saved viewport)
+- New `zoomControls` prop (default `true`) hides the zoom card when `false`; the keys still work
+- `fitViewport`, `MIN_ZOOM` and `MAX_ZOOM` are exported from `@scribblesvg/react-utils/editor`
+- The "Skipped invalid icons" notice moved to the bottom-left of the canvas, clear of the zoom card
+
 ## 0.2.3 / 0.2.6
 
 Editor and geometry improvements:

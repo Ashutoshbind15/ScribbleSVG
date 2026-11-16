@@ -37,6 +37,9 @@ export type {
 // Coordinate utilities
 export { screenToCanvas, canvasToScreen, getViewBox } from "./coordinate-utils";
 
+// Zoom
+export { MIN_ZOOM, MAX_ZOOM, fitViewport } from "./zoom";
+
 // Hit testing
 export {
   hitTest,

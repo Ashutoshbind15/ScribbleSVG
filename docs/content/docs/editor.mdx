@@ -53,12 +53,41 @@ The editor fills its container (`height: 100%`). Give it a bounded height with y
 <DiagramCanvas className="diagram-editor-panel" onChange={save} />
 ```
 
+## Zoom
+
+Scroll or pinch to zoom at the cursor. The zoom card in the bottom-right corner of the canvas has:
+
+- a slider from 10% to 500% on a log scale, with a soft stop at 100%
+- **Zoom to fit**, which frames all content (it zooms out to fit, but never in past 100%)
+- a reset button showing the current zoom; it is highlighted whenever zoom isn't 100%, and a click returns to 100%
+
+The slider and buttons zoom around the centre of the canvas. The same actions have keys:
+
+| Key | Action |
+| --- | --- |
+| Ctrl/⌘ + `+` (or `=`) | Zoom in to the next step (10, 25, 50, 75, 100, 150, 200, 300, 400, 500%) |
+| Ctrl/⌘ + `-` | Zoom out to the previous step |
+| Shift + 1 | Zoom to fit |
+| Shift + 0 | Reset to 100% |
+
+Shift + 1 and Shift + 0 are matched by physical key, so they work on layouts where Shift + 1 types another character. Ctrl/⌘ + `+`/`-` only zoom the canvas while it has focus; elsewhere they zoom the page as usual.
+
+Pass `fitOnLoad` to frame the initial document when the editor mounts, instead of using the viewport saved in the document. Pass `zoomControls={false}` to hide the zoom card; the keys still work.
+
+```tsx
+<DiagramCanvas initialDocument={document} fitOnLoad zoomControls={false} />
+```
+
+`fitViewport(bounds, size, { padding })` is exported from `@scribblesvg/react-utils/editor` if you want to compute a fitted viewport yourself, for example with `getContentBounds` from `@scribblesvg/core`. The zoom limits are exported as `MIN_ZOOM` and `MAX_ZOOM`.
+
+The viewport (pan and zoom) is saved in the document and reported through `onChange`, but it is not part of undo history.
+
 ## Keyboard and focus
 
-Shortcuts (undo/redo, copy/cut/paste, Delete, Space-pan, Shift-snap, text size, Escape, `?` for the shortcuts panel) only reach the editor while focus is inside it. Keys typed elsewhere on your page, such as in a form field or in a second editor, never change the diagram.
+Shortcuts (undo/redo, copy/cut/paste, Delete, Space-pan, Shift-snap, text size, zoom, Escape, `?` for the shortcuts panel) only reach the editor while focus is inside it. Keys typed elsewhere on your page, such as in a form field or in a second editor, never change the diagram.
 
 - The canvas is focusable (`tabIndex={0}`) and shows a focus ring only for keyboard focus (`:focus-visible`).
-- Pressing anywhere in the editor, including toolbar buttons, gives the canvas focus. Tabbing to a toolbar button leaves focus on the button; shortcuts still work there, except Space and Enter, which press the button.
+- Pressing anywhere in the editor, including toolbar buttons and the zoom card, gives the canvas focus. Tabbing to a toolbar button leaves focus on the button; shortcuts still work there, except Space and Enter, which press the button.
 - Text fields keep all their keys: the inline text editor, and any input, textarea, select or contenteditable you render inside the editor.
 - When focus leaves the editor, the selection is cleared, and a held Space (pan) or Shift (snap) is released so it can't stay stuck on. Switching to another window or tab keeps the selection.
 - Pinch and Ctrl/⌘ + scroll zoom work without focus.
