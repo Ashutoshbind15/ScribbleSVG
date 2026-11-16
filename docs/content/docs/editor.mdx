@@ -72,10 +72,10 @@ The slider and buttons zoom around the centre of the canvas. The same actions ha
 
 Shift + 1 and Shift + 0 are matched by physical key, so they work on layouts where Shift + 1 types another character. Ctrl/⌘ + `+`/`-` only zoom the canvas while it has focus; elsewhere they zoom the page as usual.
 
-Pass `fitOnLoad` to frame the initial document when the editor mounts, instead of using the viewport saved in the document. Pass `zoomControls={false}` to hide the zoom card; the keys still work.
+Pass `fitOnLoad` to frame the initial document when the editor mounts, instead of using the viewport saved in the document.
 
 ```tsx
-<DiagramCanvas initialDocument={document} fitOnLoad zoomControls={false} />
+<DiagramCanvas initialDocument={document} fitOnLoad />
 ```
 
 `fitViewport(bounds, size, { padding })` is exported from `@scribblesvg/react-utils/editor` if you want to compute a fitted viewport yourself, for example with `getContentBounds` from `@scribblesvg/core`. The zoom limits are exported as `MIN_ZOOM` and `MAX_ZOOM`.

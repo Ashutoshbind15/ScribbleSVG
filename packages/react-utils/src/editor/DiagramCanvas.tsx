@@ -81,11 +81,6 @@ export interface DiagramCanvasProps {
    * saved viewport is kept.
    */
   fitOnLoad?: boolean;
-  /**
-   * Show the zoom card (slider, zoom to fit, reset) in the bottom-right
-   * corner. The zoom shortcuts work either way.
-   */
-  zoomControls?: boolean;
 }
 
 /**
@@ -100,7 +95,6 @@ export function DiagramCanvas({
   className,
   autoFocus = false,
   fitOnLoad = false,
-  zoomControls = true,
 }: DiagramCanvasProps) {
   const [state, dispatch] = useCanvasReducer(initialDocument);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -695,14 +689,12 @@ export function DiagramCanvas({
           {textSizeGrip}
         </svg>
 
-        {zoomControls && (
-          <ZoomControls
-            zoom={viewport.zoom}
-            onZoomChange={zoomToCentre}
-            onFit={zoomToFit}
-            onReset={resetZoom}
-          />
-        )}
+        <ZoomControls
+          zoom={viewport.zoom}
+          onZoomChange={zoomToCentre}
+          onFit={zoomToFit}
+          onReset={resetZoom}
+        />
 
         {catalog.warnings.length > 0 && (
           <div

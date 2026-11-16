@@ -137,7 +137,6 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   {
     id: "zoom-step",
     help: { label: "Zoom in / out", keys: (a) => [modLabel(a), "+"], altKeys: () => ["-"] },
-    // The browser's page-zoom keys, claimed only while the editor has focus.
     // By key: "+" and "=" share a key on US layouts but not on all others.
     resolve: (e, ctx) => {
       if (!modChord(e, ctx)) return null;

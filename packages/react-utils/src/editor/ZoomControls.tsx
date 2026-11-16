@@ -83,10 +83,10 @@ function stopPropagation(e: React.SyntheticEvent) {
 }
 
 /**
- * shadcn-style slider on a log scale, with a soft detent at 100%. A custom
- * role="slider" rather than <input type="range">: the editor treats inputs
- * as text fields that keep focus and every key, while a press here should
- * hand focus to the canvas like the other buttons.
+ * Slider on a log scale: filled track, round thumb, a soft notch at 100%.
+ * A custom role="slider" rather than <input type="range">: the editor treats
+ * inputs as text fields that keep focus and every key, while a press here
+ * should hand focus to the canvas like the other buttons.
  */
 function ZoomSlider({
   zoom,
