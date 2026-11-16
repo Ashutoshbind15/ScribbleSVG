@@ -1,105 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { CloseIcon, KeyboardIcon } from "./toolbarIcons";
-
-interface ShortcutRow {
-  keys: string[];
-  /** Alternate chord shown after `/` (e.g. Ctrl+Y redo on Windows/Linux). */
-  altKeys?: string[];
-  label: string;
-}
-
-function isApplePlatform(): boolean {
-  if (typeof navigator === "undefined") return false;
-
-  const uaData = (
-    navigator as Navigator & { userAgentData?: { platform?: string } }
-  ).userAgentData;
-  const hint = uaData?.platform ?? navigator.userAgent;
-
-  return /mac|iphone|ipad|ipod/i.test(hint);
-}
-
-function modKey(isApple: boolean): string {
-  return isApple ? "⌘" : "Ctrl";
-}
-
-function buildShortcuts(mod: string, isApple: boolean): ShortcutRow[] {
-  return [
-    { keys: ["Two-finger scroll"], label: "Pan canvas" },
-    { keys: ["Pinch"], label: "Zoom (trackpad)" },
-    { keys: ["Ctrl", "scroll"], label: "Zoom (fine)" },
-    { keys: ["Scroll wheel"], label: "Zoom (mouse)" },
-    { keys: ["Space", "drag"], label: "Pan canvas" },
-    { keys: ["Shift", "click"], label: "Multi-select" },
-    { keys: ["Drag empty"], label: "Box select" },
-    { keys: ["Shift", "drag"], label: "Add to box selection" },
-    { keys: ["Shift"], label: "Straight arrow/line (22.5°)" },
-    { keys: [mod, "C"], label: "Copy" },
-    { keys: [mod, "X"], label: "Cut" },
-    { keys: [mod, "V"], label: "Paste" },
-    { keys: [mod, "Z"], label: "Undo" },
-    {
-      keys: [mod, "Shift", "Z"],
-      // Matches useCanvasInteraction: Ctrl+Y redo on Windows/Linux only
-      ...(isApple ? {} : { altKeys: ["Ctrl", "Y"] }),
-      label: "Redo",
-    },
-    { keys: ["Del"], altKeys: ["Backspace"], label: "Delete selection" },
-    { keys: ["2× click"], label: "Edit text" },
-    { keys: [mod, "Shift", ">"], altKeys: ["<"], label: "Text size up / down" },
-    { keys: ["?"], label: "Toggle this panel" },
-  ];
-}
+import { helpRows } from "./keymap";
 
 function renderKeys(keys: string[], idPrefix: string) {
   return keys.map((key) => <kbd key={`${idPrefix}-${key}`}>{key}</kbd>);
 }
 
-/**
- * Keyboard-shortcuts helper for the canvas header.
- * Toggle via the button or the `?` key (when not typing).
- */
-export function KeyboardShortcuts() {
-  const [open, setOpen] = useState(false);
-  const [isApple, setIsApple] = useState(false);
+interface KeyboardShortcutsProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isApple: boolean;
+}
 
-  useEffect(() => {
-    setIsApple(isApplePlatform());
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
-        e.preventDefault();
-        setOpen((prev) => !prev);
-      } else if (e.key === "Escape" && open) {
-        e.preventDefault();
-        setOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
-
+export function KeyboardShortcuts({
+  open,
+  onOpenChange,
+  isApple,
+}: KeyboardShortcutsProps) {
   const stopPropagation = useCallback((e: React.SyntheticEvent) => {
     e.stopPropagation();
   }, []);
 
-  const mod = modKey(isApple);
-  const shortcuts = buildShortcuts(mod, isApple);
+  const shortcuts = helpRows(isApple);
 
   return (
     <div
@@ -114,7 +36,7 @@ export function KeyboardShortcuts() {
         aria-label="Useful keyboard shortcuts"
         aria-expanded={open}
         aria-pressed={open}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => onOpenChange(!open)}
       >
         <KeyboardIcon />
       </button>
@@ -131,19 +53,19 @@ export function KeyboardShortcuts() {
               type="button"
               title="Close"
               aria-label="Close shortcuts"
-              onClick={() => setOpen(false)}
+              onClick={() => onOpenChange(false)}
             >
               <CloseIcon />
             </button>
           </div>
           <ul className="scribblesvg-editor__shortcuts-list">
-            {shortcuts.map(({ keys, altKeys, label }) => (
-              <li key={label}>
+            {shortcuts.map(({ id, keys, altKeys, label }) => (
+              <li key={id}>
                 <span className="scribblesvg-editor__shortcuts-label">
                   {label}
                 </span>
                 <span className="scribblesvg-editor__shortcuts-keys">
-                  {renderKeys(keys, label)}
+                  {renderKeys(keys, id)}
                   {altKeys && (
                     <>
                       <span
@@ -152,7 +74,7 @@ export function KeyboardShortcuts() {
                       >
                         /
                       </span>
-                      {renderKeys(altKeys, `${label}-alt`)}
+                      {renderKeys(altKeys, `${id}-alt`)}
                     </>
                   )}
                 </span>
