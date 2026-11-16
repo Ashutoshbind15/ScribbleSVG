@@ -2,11 +2,15 @@ import { useReducer } from "react";
 import {
   EMPTY_DOCUMENT,
   getContentBounds,
+  isDiagramElement,
   type DiagramDocument,
   type DiagramElement,
+  type ImageElement,
   type Viewport,
 } from "@scribblesvg/core";
-import { fitViewport } from "./zoom";
+import { screenToCanvas } from "./coordinate-utils";
+import { fitImageToViewport } from "./image-fit";
+import { fitViewport, zoomAround } from "./zoom";
 
 // ── Tool types ──
 
@@ -59,6 +63,21 @@ export type CanvasAction =
   | { type: "SET_TOOL"; tool: ToolType; activeIconId?: string | null }
   | { type: "SET_VIEWPORT"; viewport: Viewport }
   | { type: "RESIZE"; size: { width: number; height: number } }
+  /**
+   * Zoom by `factor`, keeping the canvas point under `screenPoint` (pixels
+   * from the canvas's top-left) in place.
+   */
+  | { type: "ZOOM_AT"; factor: number; screenPoint: { x: number; y: number } }
+  /** Scroll the viewport by screen pixels. */
+  | { type: "PAN_BY"; dx: number; dy: number }
+  /**
+   * Add an image centred in the viewport, select it and switch to the select
+   * tool. An image that fails validation is skipped.
+   */
+  | {
+      type: "INSERT_IMAGE";
+      image: Omit<ImageElement, "x" | "y" | "width" | "height">;
+    }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
   | {
       type: "ADD_ELEMENTS";
@@ -181,6 +200,62 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
         return state;
       }
       return { ...state, size };
+    }
+
+    case "ZOOM_AT": {
+      const { viewport } = state.document;
+      const anchor = screenToCanvas(
+        action.screenPoint.x,
+        action.screenPoint.y,
+        viewport,
+        state.size,
+      );
+      return {
+        ...state,
+        document: {
+          ...state.document,
+          viewport: zoomAround(viewport, viewport.zoom * action.factor, anchor),
+        },
+      };
+    }
+
+    case "PAN_BY": {
+      const { viewport } = state.document;
+      return {
+        ...state,
+        document: {
+          ...state.document,
+          viewport: {
+            ...viewport,
+            x: viewport.x + action.dx / viewport.zoom,
+            y: viewport.y + action.dy / viewport.zoom,
+          },
+        },
+      };
+    }
+
+    case "INSERT_IMAGE": {
+      const { image } = action;
+      const element: ImageElement = {
+        ...image,
+        ...fitImageToViewport(
+          { width: image.naturalWidth, height: image.naturalHeight },
+          state.document.viewport,
+          state.size,
+        ),
+      };
+      // Never let a bad host result into the document.
+      if (!isDiagramElement(element)) return state;
+      return withHistory(state, {
+        ...state,
+        document: {
+          ...state.document,
+          elements: [...state.document.elements, element],
+        },
+        selectedIds: new Set([element.id]),
+        tool: "select",
+        activeIconId: null,
+      });
     }
 
     case "ADD_ELEMENT":
