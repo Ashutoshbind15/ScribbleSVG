@@ -1,4 +1,3 @@
-import type { Dispatch } from "react";
 import {
   getAnchorPoint,
   getElementCenter,
@@ -6,19 +5,6 @@ import {
   isConnector,
   type DiagramElement,
 } from "@scribblesvg/core";
-import type { CanvasAction } from "./useCanvasReducer";
-
-export function applyElementPatches(
-  elements: DiagramElement[],
-  updates: { id: string; patch: Partial<DiagramElement> }[],
-): DiagramElement[] {
-  const patchMap = new Map(updates.map((u) => [u.id, u.patch]));
-  return elements.map((el) => {
-    const patch = patchMap.get(el.id);
-    return patch ? ({ ...el, ...patch } as DiagramElement) : el;
-  });
-}
-
 /**
  * Compute anchor updates for connectors (arrows/lines) bound to the given elements.
  */
@@ -70,15 +56,4 @@ export function getBoundArrowAnchorUpdates(
   }
 
   return updates;
-}
-
-export function dispatchBoundArrowAnchorUpdates(
-  affectedIds: Set<string>,
-  elements: DiagramElement[],
-  dispatch: Dispatch<CanvasAction>,
-) {
-  const updates = getBoundArrowAnchorUpdates(affectedIds, elements);
-  if (updates.length > 0) {
-    dispatch({ type: "UPDATE_ELEMENTS", updates });
-  }
 }

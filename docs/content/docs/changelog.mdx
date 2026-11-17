@@ -39,6 +39,14 @@ Editor state in one place, for direct users of the reducer and hooks (`DiagramCa
 - New reducer actions for events that used to read refs: `ZOOM_AT` (wheel and pinch zoom around the pointer), `PAN_BY` (wheel scroll) and `INSERT_IMAGE` (place, select and switch to the select tool in one step). Quick wheel events between renders now all count instead of some reading a stale viewport
 - **Breaking for direct `useCanvasInteraction` users:** the hook reads the canvas size from `state.size`, so its `containerSize` argument is gone: call `useCanvasInteraction(state, dispatch, svgRef, icons)`
 
+- Placement uses one `PLACE_ELEMENT` transition (also shared by `INSERT_IMAGE`); `SELECT_ELEMENT` selects an existing element and switches tools. Undo restores the previous elements and selection, including grouped creation.
+
+- Drag, resize and group-scale use `UPDATE_ELEMENTS.reanchor` to update bound connectors from current reducer state. Pointer-up no longer writes anchors from a potentially older render.
+
+- **Breaking for direct users:** removed `useElementDrag` and `useElementResize`. Use the exported pure `startDrag` / `dragPatches` and `startResize` / `startGroupScale` / `resizePatches` helpers; store their sessions in `Gesture`, dispatch `BEGIN_HISTORY` on start, `UPDATE_ELEMENTS` with `reanchor: true` on moves, and `END_HISTORY` on release. `resizePatches` accepts a fourth text-measurement argument for host glyph metrics. The unused `isDragging` / `isResizing` callbacks and duplicate refs are gone.
+
+- Connector previews are derived from start, pointer, snapping threshold and Shift inputs against current elements. `useArrowCreation` keeps its existing returns and adds `setShiftSnap` plus an optional third (current snap threshold) argument. `useCanvasInteraction.setShiftSnap` still re-snaps without pointer movement; leaving connector tools cancels creation.
+
 ## 0.2.3 / 0.2.6
 
 Editor and geometry improvements:

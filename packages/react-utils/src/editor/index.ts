@@ -75,8 +75,11 @@ export type {
 
 // Interaction hooks
 export { useCanvasInteraction } from "./useCanvasInteraction";
-export { useElementDrag } from "./useElementDrag";
-export { useElementResize } from "./useElementResize";
+export { startDrag, dragPatches } from "./drag";
+export type { DragSession } from "./drag";
+export { startResize, startGroupScale, resizePatches } from "./resize";
+export type { ResizeSession } from "./resize";
+export type { Gesture } from "./gesture";
 export { useArrowCreation } from "./useArrowCreation";
 export type { ConnectorKind, ArrowStartState } from "./useArrowCreation";
 

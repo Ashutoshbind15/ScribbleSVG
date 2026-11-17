@@ -108,6 +108,15 @@ Treat catalog SVG as trusted host input (your bundled pack or admin-curated mark
 
 Use `onChange` to keep the document in sync (e.g. save to your backend). The document is plain JSON from `@scribblesvg/core` — see [Document model](/docs/document-model).
 
+## Direct reducer placement
+
+For direct reducer consumers, `PLACE_ELEMENT` adds an element, selects it and
+switches to the select tool in one undoable transition. `INSERT_IMAGE` shares
+that placement logic after fitting and validating the image.
+`SELECT_ELEMENT` selects an existing id and switches tools without changing
+the document or adding history. Creation and subsequent size/text updates can
+share a `BEGIN_HISTORY` / `END_HISTORY` group.
+
 ## Images
 
 Pass `onRequestImage` to `DiagramCanvas` to show the Image toolbar button. Return a promise resolving to `{ src, alt? }`, or `null` to cancel. The editor loads and measures the image, then inserts it in the viewport and selects it.
@@ -121,3 +130,34 @@ Pass `onRequestImage` to `DiagramCanvas` to show the Image toolbar button. Retur
 Anything else, such as `blob:` or `javascript:` URLs, is ignored and nothing is inserted. For a local file, upload it and return its URL, or read it as a `data:` URI. Sources containing tabs, newlines or leading/trailing spaces are also rejected, so remove line breaks from base64 data first.
 
 Dragging an image's corner handle keeps its aspect ratio. Hold **Shift** to stretch it freely. The edge handles always stretch one side.
+
+## Direct interaction helpers
+
+`DiagramCanvas` owns drag and resize sessions in its `Gesture`. Direct consumers
+should replace the removed `useElementDrag` and `useElementResize` hooks with
+the pure helpers exported from `@scribblesvg/react-utils/editor`:
+
+- `startDrag(elements, ids, point)` returns a `DragSession`; `dragPatches(session, point)` computes position patches from its original snapshots.
+- `startResize(elements, id, handle, point)` and `startGroupScale(elements, ids, handle, point)` return a `ResizeSession`, or `null` when the target is unavailable.
+- `resizePatches(session, point, freeAspect, measureText)` computes size patches; `freeAspect` defaults to false. The optional fourth argument measures text with your host's font; the default uses core text metrics.
+
+Store a drag session in `{ type: "dragging", ...session, pendingEdit: null }`
+or a resize session in `{ type: "resizing", ...session }`. Dispatch
+`BEGIN_HISTORY` on start, `UPDATE_ELEMENTS` with the patches and
+`reanchor: true` on moves, and `END_HISTORY` on release. Bound connectors
+are re-anchored in the same reducer transition; release needs no extra
+endpoint updates. The exported `Gesture`, `DragSession` and `ResizeSession`
+types describe the stored data; `isDragging` and `isResizing` are replaced by
+checking the gesture's `type`.
+
+## Direct connector previews
+
+`useArrowCreation(elements, dispatch, snapThreshold?)` derives its preview from
+the current elements and stored start, pointer and Shift inputs. Existing
+`arrowStart`, `previewStart`, `previewEnd`, `handleArrowClick`,
+`updatePreview` and `cancelArrow` returns remain available; `setShiftSnap(boolean)`
+updates the constraint without moving the pointer. The optional third argument
+supplies the current canvas-space snapping threshold (for example, screen
+pixels divided by zoom); without it, the latest `updatePreview` threshold is
+used. Direct consumers should cancel creation when leaving connector tools,
+as `useCanvasInteraction` does.

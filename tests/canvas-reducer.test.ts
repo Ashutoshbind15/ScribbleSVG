@@ -198,3 +198,50 @@ test("INSERT_IMAGE skips an image that fails validation", () => {
   });
   assert.equal(next, state);
 });
+
+for (const grouped of [false, true]) {
+  test(`placement restores elements and selection on undo (grouped=${grouped})`, () => {
+    const initial = stateWith({ selectedIds: new Set([rect.id]), tool: "rectangle" });
+    let state = grouped ? canvasReducer(initial, { type: "BEGIN_HISTORY" }) : initial;
+    state = canvasReducer(state, { type: "PLACE_ELEMENT", element: { ...rect, id: "new" } });
+    assert.equal(state.tool, "select");
+    assert.deepEqual([...state.selectedIds], ["new"]);
+    if (grouped) {
+      state = canvasReducer(state, { type: "UPDATE_ELEMENT", id: "new", patch: { x: 100 } });
+      state = canvasReducer(state, { type: "END_HISTORY" });
+    }
+    assert.equal(state.past.length, 1);
+    state = canvasReducer(state, { type: "UNDO" });
+    assert.deepEqual(state.document.elements, initial.document.elements);
+    assert.deepEqual(state.selectedIds, initial.selectedIds);
+    assert.deepEqual([...canvasReducer(state, { type: "REDO" }).selectedIds], ["new"]);
+  });
+}
+
+test("bulk movement reanchors current bound endpoints in one history group", () => {
+  const arrow = { type: "arrow" as const, id: "a", seed: 1, startX: 2000, startY: 500, endX: 3000, endY: 500, startBinding: "r" };
+  const free = { ...arrow, id: "free", startBinding: undefined };
+  const initial = stateWith({}, { ...EMPTY_DOCUMENT, elements: [rect, arrow, free] });
+  let state = canvasReducer(initial, { type: "BEGIN_HISTORY" });
+  for (const x of [100, 200]) {
+    state = canvasReducer(state, { type: "UPDATE_ELEMENTS", updates: [{ id: "r", patch: { x } }], reanchor: true });
+    const bound = state.document.elements[1] as typeof arrow;
+    assert.equal(bound.startX, 2000 + x);
+    assert.equal(bound.startY, 500);
+    assert.equal(state.document.elements[2], free);
+  }
+  state = canvasReducer(state, { type: "END_HISTORY" });
+  assert.equal(state.past.length, 1);
+  assert.deepEqual(canvasReducer(state, { type: "UNDO" }).document.elements, initial.document.elements);
+});
+
+test("an anchor update from an older render can overwrite the last move", async () => {
+  const { getBoundArrowAnchorUpdates } = await import("../packages/react-utils/src/editor/arrowAnchors.ts");
+  const arrow = { type: "arrow" as const, id: "a", seed: 1, startX: 2000, startY: 500, endX: 3000, endY: 500, startBinding: "r" };
+  const old = stateWith({}, { ...EMPTY_DOCUMENT, elements: [rect, arrow] });
+  const moved = canvasReducer(old, { type: "UPDATE_ELEMENTS", updates: [{ id: "r", patch: { x: 200 } }], reanchor: true });
+  const staleRelease = canvasReducer(moved, { type: "UPDATE_ELEMENTS", updates: getBoundArrowAnchorUpdates(new Set(["r"]), old.document.elements) });
+  assert.equal((moved.document.elements[1] as typeof arrow).startX, 2200);
+  assert.equal((staleRelease.document.elements[1] as typeof arrow).startX, 2000);
+  assert.equal((canvasReducer(moved, { type: "END_HISTORY" }).document.elements[1] as typeof arrow).startX, 2200);
+});

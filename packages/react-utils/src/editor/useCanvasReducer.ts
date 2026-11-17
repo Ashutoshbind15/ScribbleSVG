@@ -8,6 +8,7 @@ import {
   type ImageElement,
   type Viewport,
 } from "@scribblesvg/core";
+import { getBoundArrowAnchorUpdates } from "./arrowAnchors";
 import { screenToCanvas } from "./coordinate-utils";
 import { fitImageToViewport } from "./image-fit";
 import { fitViewport, zoomAround } from "./zoom";
@@ -78,6 +79,8 @@ export type CanvasAction =
       type: "INSERT_IMAGE";
       image: Omit<ImageElement, "x" | "y" | "width" | "height">;
     }
+  | { type: "PLACE_ELEMENT"; element: DiagramElement }
+  | { type: "SELECT_ELEMENT"; id: string }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
   | {
       type: "ADD_ELEMENTS";
@@ -89,6 +92,8 @@ export type CanvasAction =
   | {
       type: "UPDATE_ELEMENTS";
       updates: { id: string; patch: Partial<DiagramElement> }[];
+      /** Recompute bound endpoints from the patched document in this transition. */
+      reanchor?: boolean;
     }
   | { type: "DELETE_ELEMENTS"; ids: string[] }
   | { type: "SET_SELECTION"; ids: string[] }
@@ -246,17 +251,25 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
       };
       // Never let a bad host result into the document.
       if (!isDiagramElement(element)) return state;
-      return withHistory(state, {
+      return canvasReducer(state, { type: "PLACE_ELEMENT", element });
+    }
+
+    case "SELECT_ELEMENT":
+      return {
         ...state,
-        document: {
-          ...state.document,
-          elements: [...state.document.elements, element],
-        },
-        selectedIds: new Set([element.id]),
         tool: "select",
         activeIconId: null,
+        selectedIds: new Set([action.id]),
+      };
+
+    case "PLACE_ELEMENT":
+      return withHistory(state, {
+        ...canvasReducer(state, { type: "SELECT_ELEMENT", id: action.element.id }),
+        document: {
+          ...state.document,
+          elements: [...state.document.elements, action.element],
+        },
       });
-    }
 
     case "ADD_ELEMENT":
       return withHistory(state, {
@@ -298,13 +311,23 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
       if (action.updates.length === 0) return state;
       const patchMap = new Map(action.updates.map((u) => [u.id, u.patch]));
       let changed = false;
-      const elements = state.document.elements.map((el) => {
+      let elements = state.document.elements.map((el) => {
         const patch = patchMap.get(el.id);
         if (!patch) return el;
         changed = true;
         return { ...el, ...patch } as DiagramElement;
       });
       if (!changed) return state;
+      if (action.reanchor) {
+        const anchors = new Map(getBoundArrowAnchorUpdates(
+          new Set(action.updates.map((u) => u.id)),
+          elements,
+        ).map((u) => [u.id, u.patch]));
+        elements = elements.map((el) => {
+          const patch = anchors.get(el.id);
+          return patch ? { ...el, ...patch } as DiagramElement : el;
+        });
+      }
       return withHistory(state, {
         ...state,
         document: { ...state.document, elements },

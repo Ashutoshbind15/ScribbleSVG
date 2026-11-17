@@ -1,21 +1,14 @@
-import { useCallback, useRef } from "react";
 import {
   DEFAULT_SHAPE_LABEL_FONT_SIZE,
   DEFAULT_TEXT_FONT_SIZE,
   getElementBounds,
+  measureTextSize,
   isLabeledShape,
   scaleFontSizeForResize,
   type Bounds,
   type DiagramElement,
 } from "@scribblesvg/core";
 import { getElementsBounds, type HandlePosition } from "./hit-test";
-import type { CanvasAction } from "./useCanvasReducer";
-import {
-  applyElementPatches,
-  dispatchBoundArrowAnchorUpdates,
-  getBoundArrowAnchorUpdates,
-} from "./arrowAnchors";
-import { measureDomTextSize } from "./measureDomText";
 import { isCornerHandle, lockAspectRatio } from "./aspect-ratio";
 import {
   computeGroupScale,
@@ -50,169 +43,43 @@ interface GroupScaleState {
   originalElements: DiagramElement[];
 }
 
-/**
- * Hook for resizing a single selected element via drag handles, or scaling
- * a multi-selection from its group box corners.
- */
-export function useElementResize(
-  elements: DiagramElement[],
-  dispatch: React.Dispatch<CanvasAction>,
-) {
-  const resizeRef = useRef<ResizeState | GroupScaleState | null>(null);
+export type ResizeSession = ResizeState | GroupScaleState;
 
-  const startResize = useCallback(
-    (
-      elementId: string,
-      handle: HandlePosition,
-      canvasPoint: { x: number; y: number },
-    ) => {
-      const el = elements.find((e) => e.id === elementId);
-      if (!el) return;
+type Point = { x: number; y: number };
+type MeasureText = (text: string, fontSize: number) => { width: number; height: number };
 
-      resizeRef.current = {
-        kind: "single",
-        elementId,
-        handle,
-        startCanvasPoint: canvasPoint,
-        startBounds: getElementBounds(el),
-        originalElement: el,
-      };
-      dispatch({ type: "BEGIN_HISTORY" });
-    },
-    [elements, dispatch],
-  );
+export function startResize(elements: DiagramElement[], elementId: string, handle: HandlePosition, point: Point): ResizeSession | null {
+  const el = elements.find((el) => el.id === elementId);
+  return el ? {
+    kind: "single", elementId, handle, startCanvasPoint: point,
+    startBounds: getElementBounds(el), originalElement: el,
+  } : null;
+}
 
-  const startGroupScale = useCallback(
-    (
-      ids: ReadonlySet<string>,
-      handle: HandlePosition,
-      canvasPoint: { x: number; y: number },
-    ) => {
-      const originalElements = elements.filter((el) => ids.has(el.id));
-      const startBounds = getElementsBounds(originalElements);
-      if (!startBounds) return false;
+export function startGroupScale(elements: DiagramElement[], ids: ReadonlySet<string>, handle: HandlePosition, point: Point): ResizeSession | null {
+  const originalElements = elements.filter((el) => ids.has(el.id));
+  const startBounds = getElementsBounds(originalElements);
+  return startBounds ? {
+    kind: "group", ids: new Set(ids), handle, startCanvasPoint: point,
+    startBounds, anchor: getScaleAnchor(startBounds, handle),
+    minScale: getMinGroupScale(originalElements), originalElements,
+  } : null;
+}
 
-      resizeRef.current = {
-        kind: "group",
-        ids: new Set(ids),
-        handle,
-        startCanvasPoint: canvasPoint,
-        startBounds,
-        anchor: getScaleAnchor(startBounds, handle),
-        minScale: getMinGroupScale(originalElements),
-        originalElements,
-      };
-      dispatch({ type: "BEGIN_HISTORY" });
-      return true;
-    },
-    [elements, dispatch],
-  );
-
-  /**
-   * `freeAspect` (Shift) lets an image's corner handles stretch it; without
-   * it they keep the image's aspect ratio.
-   */
-  const continueResize = useCallback(
-    (canvasPoint: { x: number; y: number }, freeAspect = false) => {
-      const resize = resizeRef.current;
-      if (!resize) return;
-
-      if (resize.kind === "group") {
-        const scale = computeGroupScale(
-          resize.startBounds,
-          resize.handle,
-          canvasPoint.x - resize.startCanvasPoint.x,
-          canvasPoint.y - resize.startCanvasPoint.y,
-          resize.minScale,
-        );
-        const elementUpdates = getGroupScalePatches(
-          resize.originalElements,
-          resize.anchor,
-          scale,
-        );
-        // Re-anchor bound connector ends onto the scaled shapes, folding
-        // those fixes into any selected connector's own scale patch.
-        const projectedElements = applyElementPatches(elements, elementUpdates);
-        const updates = new Map(elementUpdates.map((u) => [u.id, u.patch]));
-        for (const { id, patch } of getBoundArrowAnchorUpdates(
-          resize.ids,
-          projectedElements,
-        )) {
-          updates.set(id, { ...updates.get(id), ...patch });
-        }
-        dispatch({
-          type: "UPDATE_ELEMENTS",
-          updates: Array.from(updates, ([id, patch]) => ({ id, patch })),
-        });
-        return;
-      }
-
-      const dx = canvasPoint.x - resize.startCanvasPoint.x;
-      const dy = canvasPoint.y - resize.startCanvasPoint.y;
-      let newBounds = computeResizedBounds(
-        resize.startBounds,
-        resize.handle,
-        dx,
-        dy,
-      );
-      if (
-        resize.originalElement.type === "image" &&
-        !freeAspect &&
-        isCornerHandle(resize.handle)
-      ) {
-        newBounds = lockAspectRatio(
-          resize.startBounds,
-          newBounds,
-          resize.handle,
-          MIN_SIZE,
-        );
-      }
-
-      const patch = boundsToElementPatch(
-        resize.originalElement,
-        newBounds,
-        resize.startBounds,
-        resize.handle,
-      );
-      if (patch) {
-        const elementUpdates = [{ id: resize.elementId, patch }];
-        const projectedElements = applyElementPatches(elements, elementUpdates);
-        const arrowUpdates = getBoundArrowAnchorUpdates(
-          new Set([resize.elementId]),
-          projectedElements,
-        );
-        dispatch({
-          type: "UPDATE_ELEMENTS",
-          updates: [...elementUpdates, ...arrowUpdates],
-        });
-      }
-    },
-    [elements, dispatch],
-  );
-
-  const endResize = useCallback(() => {
-    if (!resizeRef.current) return false;
-
-    // Recalculate bound arrow anchors after resize
-    const resize = resizeRef.current;
-    const resizedIds =
-      resize.kind === "group" ? resize.ids : new Set([resize.elementId]);
-    dispatchBoundArrowAnchorUpdates(resizedIds, elements, dispatch);
-
-    resizeRef.current = null;
-    dispatch({ type: "END_HISTORY" });
-    return true;
-  }, [elements, dispatch]);
-
-  const isResizing = useCallback(() => resizeRef.current !== null, []);
-
-  return {
-    startResize,
-    startGroupScale,
-    continueResize,
-    endResize,
-    isResizing,
-  };
+/** Pass the host's text measurement to preserve its rendered glyph bounds. */
+export function resizePatches(resize: ResizeSession, point: Point, freeAspect = false, measureText: MeasureText = measureTextSize) {
+  const dx = point.x - resize.startCanvasPoint.x;
+  const dy = point.y - resize.startCanvasPoint.y;
+  if (resize.kind === "group") {
+    const scale = computeGroupScale(resize.startBounds, resize.handle, dx, dy, resize.minScale);
+    return getGroupScalePatches(resize.originalElements, resize.anchor, scale);
+  }
+  let bounds = computeResizedBounds(resize.startBounds, resize.handle, dx, dy);
+  if (resize.originalElement.type === "image" && !freeAspect && isCornerHandle(resize.handle)) {
+    bounds = lockAspectRatio(resize.startBounds, bounds, resize.handle, MIN_SIZE);
+  }
+  const patch = boundsToElementPatch(resize.originalElement, bounds, resize.startBounds, resize.handle, measureText);
+  return patch ? [{ id: resize.elementId, patch }] : [];
 }
 
 /**
@@ -269,6 +136,7 @@ function boundsToElementPatch(
   bounds: Bounds,
   resizeStartBounds: Bounds,
   handle: HandlePosition,
+  measureText: MeasureText,
 ): Partial<DiagramElement> | null {
   switch (original.type) {
     case "rectangle":
@@ -308,7 +176,7 @@ function boundsToElementPatch(
         bounds,
         resizeStartBounds,
       );
-      const size = measureDomTextSize(original.text, fontSize);
+      const size = measureText(original.text, fontSize);
       const { x, y } = anchorTextTopLeft(resizeStartBounds, size, handle);
       return {
         x,
