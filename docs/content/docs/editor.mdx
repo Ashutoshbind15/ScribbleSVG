@@ -149,3 +149,15 @@ are re-anchored in the same reducer transition; release needs no extra
 endpoint updates. The exported `Gesture`, `DragSession` and `ResizeSession`
 types describe the stored data; `isDragging` and `isResizing` are replaced by
 checking the gesture's `type`.
+
+## Direct connector previews
+
+`useArrowCreation(elements, dispatch, snapThreshold?)` derives its preview from
+the current elements and stored start, pointer and Shift inputs. Existing
+`arrowStart`, `previewStart`, `previewEnd`, `handleArrowClick`,
+`updatePreview` and `cancelArrow` returns remain available; `setShiftSnap(boolean)`
+updates the constraint without moving the pointer. The optional third argument
+supplies the current canvas-space snapping threshold (for example, screen
+pixels divided by zoom); without it, the latest `updatePreview` threshold is
+used. Direct consumers should cancel creation when leaving connector tools,
+as `useCanvasInteraction` does.

@@ -187,25 +187,12 @@ export function useCanvasInteraction(
     handleArrowClick,
     updatePreview,
     cancelArrow,
-  } = useArrowCreation(elements, dispatch);
+    setShiftSnap,
+  } = useArrowCreation(elements, dispatch, HANDLE_SIZE / viewport.zoom);
 
   // Hovered connection point while a connector tool is active
   const [hoveredConnectionPoint, setHoveredConnectionPoint] =
     useState<ConnectionPointHit | null>(null);
-
-  // Last cursor position while a connector tool is active — lets Shift
-  // keydown/keyup re-snap the preview without waiting for pointer movement.
-  const lastConnectorPointRef = useRef<{ x: number; y: number } | null>(null);
-
-  const updateConnectorPreviewForShift = useCallback(
-    (constrain: boolean) => {
-      if (!arrowStart || !isConnectorTool(tool)) return;
-      const point = lastConnectorPointRef.current;
-      if (!point) return;
-      updatePreview(tool, point, HANDLE_SIZE / viewport.zoom, constrain);
-    },
-    [arrowStart, tool, viewport.zoom, updatePreview],
-  );
 
   useEffect(() => {
     if (!isConnectorTool(tool)) {
@@ -339,8 +326,8 @@ export function useCanvasInteraction(
 
   const releaseHeldKeys = useCallback(() => {
     setSpaceHeld(false);
-    updateConnectorPreviewForShift(false);
-  }, [updateConnectorPreviewForShift]);
+    setShiftSnap(false);
+  }, [setShiftSnap]);
 
   // ── Canvas-space point from pointer event ──
   const getCanvasPoint = useCallback(
@@ -892,7 +879,6 @@ export function useCanvasInteraction(
           } else if (isConnectorTool(tool)) {
             // Track the hovered connection point and preview the snap
             const snapThreshold = HANDLE_SIZE / viewport.zoom;
-            lastConnectorPointRef.current = canvasPoint;
             setHoveredConnectionPoint(
               hitTestConnectionPoint(canvasPoint, elements, snapThreshold),
             );
@@ -1009,7 +995,7 @@ export function useCanvasInteraction(
     stepSelectionFontSize,
     cancelGesture,
     setSpaceHeld,
-    setShiftSnap: updateConnectorPreviewForShift,
+    setShiftSnap,
     releaseHeldKeys,
     // Text editing
     editingTarget,

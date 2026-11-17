@@ -19,11 +19,26 @@ export type ArrowStartState = ConnectorPoint;
 export function useArrowCreation(
   elements: DiagramElement[],
   dispatch: React.Dispatch<CanvasAction>,
+  snapThreshold?: number,
 ) {
   const [arrowStart, setArrowStart] = useState<ArrowStartState | null>(null);
-  const [preview, setPreview] = useState<
-    ReturnType<typeof resolveConnectorTarget> | null
-  >(null);
+  const [pointer, setPointer] = useState<{
+    kind: ConnectorKind;
+    point: { x: number; y: number };
+    snapThreshold?: number;
+  } | null>(null);
+  const [constrain, setShiftSnap] = useState(false);
+  const preview = arrowStart
+    ? pointer
+      ? resolveConnectorTarget({
+          ...pointer,
+          snapThreshold: snapThreshold ?? pointer.snapThreshold,
+          elements,
+          start: arrowStart,
+          constrain,
+        })
+      : { start: arrowStart, end: arrowStart }
+    : null;
 
   const handleArrowClick = useCallback(
     (
@@ -44,7 +59,8 @@ export function useArrowCreation(
       });
       if (!resolved.end) {
         setArrowStart(resolved.start);
-        setPreview({ start: resolved.start, end: resolved.start });
+        setPointer(null);
+        setShiftSnap(constrain ?? false);
         return;
       }
       const base = {
@@ -63,7 +79,7 @@ export function useArrowCreation(
           : { ...base, type: "line" };
       dispatch({ type: "PLACE_ELEMENT", element });
       setArrowStart(null);
-      setPreview(null);
+      setPointer(null);
     },
     [arrowStart, elements, dispatch],
   );
@@ -76,21 +92,15 @@ export function useArrowCreation(
       constrain?: boolean,
     ) => {
       if (!arrowStart) return;
-      setPreview(resolveConnectorTarget({
-        kind,
-        point,
-        elements,
-        start: arrowStart,
-        snapThreshold,
-        constrain,
-      }));
+      setPointer({ kind, point, snapThreshold });
+      setShiftSnap(constrain ?? false);
     },
-    [arrowStart, elements],
+    [arrowStart],
   );
 
   const cancelArrow = useCallback(() => {
     setArrowStart(null);
-    setPreview(null);
+    setPointer(null);
   }, []);
 
   return {
@@ -100,5 +110,6 @@ export function useArrowCreation(
     handleArrowClick,
     updatePreview,
     cancelArrow,
+    setShiftSnap,
   };
 }

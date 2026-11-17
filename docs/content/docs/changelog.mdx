@@ -45,6 +45,8 @@ Editor state in one place, for direct users of the reducer and hooks (`DiagramCa
 
 - **Breaking for direct users:** removed `useElementDrag` and `useElementResize`. Use the exported pure `startDrag` / `dragPatches` and `startResize` / `startGroupScale` / `resizePatches` helpers; store their sessions in `Gesture`, dispatch `BEGIN_HISTORY` on start, `UPDATE_ELEMENTS` with `reanchor: true` on moves, and `END_HISTORY` on release. `resizePatches` accepts a fourth text-measurement argument for host glyph metrics. The unused `isDragging` / `isResizing` callbacks and duplicate refs are gone.
 
+- Connector previews are derived from start, pointer, snapping threshold and Shift inputs against current elements. `useArrowCreation` keeps its existing returns and adds `setShiftSnap` plus an optional third (current snap threshold) argument. `useCanvasInteraction.setShiftSnap` still re-snaps without pointer movement; leaving connector tools cancels creation.
+
 ## 0.2.3 / 0.2.6
 
 Editor and geometry improvements:
