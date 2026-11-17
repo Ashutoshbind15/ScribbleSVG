@@ -8,6 +8,7 @@ import {
   type ImageElement,
   type Viewport,
 } from "@scribblesvg/core";
+import { getBoundArrowAnchorUpdates } from "./arrowAnchors";
 import { screenToCanvas } from "./coordinate-utils";
 import { fitImageToViewport } from "./image-fit";
 import { fitViewport, zoomAround } from "./zoom";
@@ -91,6 +92,8 @@ export type CanvasAction =
   | {
       type: "UPDATE_ELEMENTS";
       updates: { id: string; patch: Partial<DiagramElement> }[];
+      /** Recompute bound endpoints from the patched document in this transition. */
+      reanchor?: boolean;
     }
   | { type: "DELETE_ELEMENTS"; ids: string[] }
   | { type: "SET_SELECTION"; ids: string[] }
@@ -308,13 +311,23 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
       if (action.updates.length === 0) return state;
       const patchMap = new Map(action.updates.map((u) => [u.id, u.patch]));
       let changed = false;
-      const elements = state.document.elements.map((el) => {
+      let elements = state.document.elements.map((el) => {
         const patch = patchMap.get(el.id);
         if (!patch) return el;
         changed = true;
         return { ...el, ...patch } as DiagramElement;
       });
       if (!changed) return state;
+      if (action.reanchor) {
+        const anchors = new Map(getBoundArrowAnchorUpdates(
+          new Set(action.updates.map((u) => u.id)),
+          elements,
+        ).map((u) => [u.id, u.patch]));
+        elements = elements.map((el) => {
+          const patch = anchors.get(el.id);
+          return patch ? { ...el, ...patch } as DiagramElement : el;
+        });
+      }
       return withHistory(state, {
         ...state,
         document: { ...state.document, elements },

@@ -41,6 +41,8 @@ Editor state in one place, for direct users of the reducer and hooks (`DiagramCa
 
 - Placement uses one `PLACE_ELEMENT` transition (also shared by `INSERT_IMAGE`); `SELECT_ELEMENT` selects an existing element and switches tools. Undo restores the previous elements and selection, including grouped creation.
 
+- Drag, resize and group-scale use `UPDATE_ELEMENTS.reanchor` to update bound connectors from current reducer state. Pointer-up no longer writes anchors from a potentially older render.
+
 ## 0.2.3 / 0.2.6
 
 Editor and geometry improvements:

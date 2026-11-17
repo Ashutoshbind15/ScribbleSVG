@@ -1,11 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { DiagramElement } from "@scribblesvg/core";
 import type { CanvasAction } from "./useCanvasReducer";
-import {
-  applyElementPatches,
-  dispatchBoundArrowAnchorUpdates,
-  getBoundArrowAnchorUpdates,
-} from "./arrowAnchors";
 
 interface DragState {
   /** IDs of elements being dragged */
@@ -119,16 +114,7 @@ export function useElementDrag(
       }
 
       if (updates.length > 0) {
-        const movedIds = new Set(drag.elementIds);
-        const projectedElements = applyElementPatches(elements, updates);
-        const arrowUpdates = getBoundArrowAnchorUpdates(
-          movedIds,
-          projectedElements,
-        );
-        dispatch({
-          type: "UPDATE_ELEMENTS",
-          updates: [...updates, ...arrowUpdates],
-        });
+        dispatch({ type: "UPDATE_ELEMENTS", updates, reanchor: true });
       }
     },
     [elements, dispatch],
@@ -136,10 +122,6 @@ export function useElementDrag(
 
   const endDrag = useCallback(() => {
     if (!dragRef.current) return false;
-
-    // After drag, recalculate arrow anchor points for bound arrows
-    const draggedIds = new Set(dragRef.current.elementIds);
-    dispatchBoundArrowAnchorUpdates(draggedIds, elements, dispatch);
 
     dragRef.current = null;
     dispatch({ type: "END_HISTORY" });

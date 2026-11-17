@@ -10,11 +10,6 @@ import {
 } from "@scribblesvg/core";
 import { getElementsBounds, type HandlePosition } from "./hit-test";
 import type { CanvasAction } from "./useCanvasReducer";
-import {
-  applyElementPatches,
-  dispatchBoundArrowAnchorUpdates,
-  getBoundArrowAnchorUpdates,
-} from "./arrowAnchors";
 import { measureDomTextSize } from "./measureDomText";
 import { isCornerHandle, lockAspectRatio } from "./aspect-ratio";
 import {
@@ -130,20 +125,7 @@ export function useElementResize(
           resize.anchor,
           scale,
         );
-        // Re-anchor bound connector ends onto the scaled shapes, folding
-        // those fixes into any selected connector's own scale patch.
-        const projectedElements = applyElementPatches(elements, elementUpdates);
-        const updates = new Map(elementUpdates.map((u) => [u.id, u.patch]));
-        for (const { id, patch } of getBoundArrowAnchorUpdates(
-          resize.ids,
-          projectedElements,
-        )) {
-          updates.set(id, { ...updates.get(id), ...patch });
-        }
-        dispatch({
-          type: "UPDATE_ELEMENTS",
-          updates: Array.from(updates, ([id, patch]) => ({ id, patch })),
-        });
+        dispatch({ type: "UPDATE_ELEMENTS", updates: elementUpdates, reanchor: true });
         return;
       }
 
@@ -176,15 +158,7 @@ export function useElementResize(
       );
       if (patch) {
         const elementUpdates = [{ id: resize.elementId, patch }];
-        const projectedElements = applyElementPatches(elements, elementUpdates);
-        const arrowUpdates = getBoundArrowAnchorUpdates(
-          new Set([resize.elementId]),
-          projectedElements,
-        );
-        dispatch({
-          type: "UPDATE_ELEMENTS",
-          updates: [...elementUpdates, ...arrowUpdates],
-        });
+        dispatch({ type: "UPDATE_ELEMENTS", updates: elementUpdates, reanchor: true });
       }
     },
     [elements, dispatch],
@@ -192,12 +166,6 @@ export function useElementResize(
 
   const endResize = useCallback(() => {
     if (!resizeRef.current) return false;
-
-    // Recalculate bound arrow anchors after resize
-    const resize = resizeRef.current;
-    const resizedIds =
-      resize.kind === "group" ? resize.ids : new Set([resize.elementId]);
-    dispatchBoundArrowAnchorUpdates(resizedIds, elements, dispatch);
 
     resizeRef.current = null;
     dispatch({ type: "END_HISTORY" });
