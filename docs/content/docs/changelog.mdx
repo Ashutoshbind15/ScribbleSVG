@@ -43,6 +43,8 @@ Editor state in one place, for direct users of the reducer and hooks (`DiagramCa
 
 - Drag, resize and group-scale use `UPDATE_ELEMENTS.reanchor` to update bound connectors from current reducer state. Pointer-up no longer writes anchors from a potentially older render.
 
+- **Breaking for direct users:** removed `useElementDrag` and `useElementResize`. Use the exported pure `startDrag` / `dragPatches` and `startResize` / `startGroupScale` / `resizePatches` helpers; store their sessions in `Gesture`, dispatch `BEGIN_HISTORY` on start, `UPDATE_ELEMENTS` with `reanchor: true` on moves, and `END_HISTORY` on release. `resizePatches` accepts a fourth text-measurement argument for host glyph metrics. The unused `isDragging` / `isResizing` callbacks and duplicate refs are gone.
+
 ## 0.2.3 / 0.2.6
 
 Editor and geometry improvements:

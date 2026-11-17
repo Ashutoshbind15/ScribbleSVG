@@ -41,8 +41,8 @@ import {
   type Gesture,
   type PendingEdit,
 } from "./gesture";
-import { useElementDrag } from "./useElementDrag";
-import { useElementResize } from "./useElementResize";
+import { startDrag, dragPatches } from "./drag";
+import { startResize, startGroupScale, resizePatches } from "./resize";
 import { useArrowCreation } from "./useArrowCreation";
 import type { CanvasAction, ToolType, CanvasState } from "./useCanvasReducer";
 import type { EditingTarget } from "./InlineTextEditor";
@@ -180,17 +180,6 @@ export function useCanvasInteraction(
   const viewport = doc.viewport;
 
   // Sub-hooks
-  const { startDrag, continueDrag, endDrag, isDragging } = useElementDrag(
-    elements,
-    dispatch,
-  );
-  const {
-    startResize,
-    startGroupScale,
-    continueResize,
-    endResize,
-    isResizing,
-  } = useElementResize(elements, dispatch);
   const {
     arrowStart,
     previewEnd,
@@ -604,8 +593,10 @@ export function useCanvasInteraction(
       if (selectedIds.size > 1) {
         e.preventDefault();
         e.stopPropagation();
-        if (startGroupScale(selectedIds, handle, getCanvasPoint(e))) {
-          setGesture({ type: "resizing", handle });
+        const session = startGroupScale(elements, selectedIds, handle, getCanvasPoint(e));
+        if (session) {
+          dispatch({ type: "BEGIN_HISTORY" });
+          setGesture({ type: "resizing", ...session });
           svg.setPointerCapture(e.pointerId);
         }
         return;
@@ -620,8 +611,10 @@ export function useCanvasInteraction(
       e.stopPropagation();
 
       const canvasPoint = getCanvasPoint(e);
-      setGesture({ type: "resizing", handle });
-      startResize(selectedId, handle, canvasPoint);
+      const session = startResize(elements, selectedId, handle, canvasPoint);
+      if (!session) return;
+      dispatch({ type: "BEGIN_HISTORY" });
+      setGesture({ type: "resizing", ...session });
       svg.setPointerCapture(e.pointerId);
     },
     [
@@ -631,8 +624,6 @@ export function useCanvasInteraction(
       elements,
       svgRef,
       getCanvasPoint,
-      startResize,
-      startGroupScale,
     ],
   );
 
@@ -659,15 +650,16 @@ export function useCanvasInteraction(
     [dispatch],
   );
 
-  /** Starts resizing the selection from `handle`; false if it can't be resized. */
   const startSelectionResize = useCallback(
     (handle: HandlePosition, point: Point) => {
-      if (selectedIds.size > 1) return startGroupScale(selectedIds, handle, point);
-      const [selectedId] = selectedIds;
-      startResize(selectedId, handle, point);
-      return true;
+      const session = selectedIds.size > 1
+        ? startGroupScale(elements, selectedIds, handle, point)
+        : startResize(elements, [...selectedIds][0], handle, point);
+      if (!session) return null;
+      dispatch({ type: "BEGIN_HISTORY" });
+      return { type: "resizing" as const, ...session };
     },
-    [selectedIds, startGroupScale, startResize],
+    [elements, selectedIds, dispatch],
   );
 
   /** Select tool press: resize from a handle, drag what's under the pointer, or start a marquee. */
@@ -685,14 +677,14 @@ export function useCanvasInteraction(
 
       // A group that can't scale falls through to a normal press
       const handle = hitTestSelectionHandle(point, targets, selectedIds, viewport.zoom);
-      const resizing = handle !== null && startSelectionResize(handle, point);
+      const resizing = handle !== null ? startSelectionResize(handle, point) : null;
       const hitElement = resizing
         ? null
         : hitTestSelection(point, targets, viewport.zoom, selectedIds);
 
       if (resizing) {
         e.preventDefault();
-        beginGesture({ type: "resizing", handle });
+        beginGesture(resizing);
       } else if (hitElement) {
         e.stopPropagation();
         const alreadySelected = selectedIds.has(hitElement.id);
@@ -711,13 +703,13 @@ export function useCanvasInteraction(
             screenStart: { x: e.clientX, y: e.clientY },
           };
         }
-        beginGesture({ type: "dragging", pendingEdit });
-        startDrag(alreadySelected ? Array.from(selectedIds) : [hitElement.id], point);
+        dispatch({ type: "BEGIN_HISTORY" });
+        beginGesture({ type: "dragging", pendingEdit, ...startDrag(elements, alreadySelected ? Array.from(selectedIds) : [hitElement.id], point) });
       } else if (!e.shiftKey && hitTestGroupSelection(point, targets, selectedIds)) {
         // Empty space inside a multi-selection's group box drags the group
         e.stopPropagation();
-        beginGesture({ type: "dragging", pendingEdit: null });
-        startDrag(Array.from(selectedIds), point);
+        dispatch({ type: "BEGIN_HISTORY" });
+        beginGesture({ type: "dragging", pendingEdit: null, ...startDrag(elements, Array.from(selectedIds), point) });
       } else {
         // Empty canvas → box selection (click without drag clears)
         e.preventDefault();
@@ -730,7 +722,7 @@ export function useCanvasInteraction(
         });
       }
     },
-    [selectedIds, viewport.zoom, editingTarget, dispatch, startSelectionResize, startDrag],
+    [selectedIds, viewport.zoom, editingTarget, dispatch, elements, startSelectionResize],
   );
 
   // ── Pointer down on SVG ──
@@ -869,11 +861,11 @@ export function useCanvasInteraction(
           break;
 
         case "dragging":
-          continueDrag(canvasPoint);
+          dispatch({ type: "UPDATE_ELEMENTS", updates: dragPatches(gesture, canvasPoint), reanchor: true });
           break;
 
         case "resizing":
-          continueResize(canvasPoint, e.shiftKey);
+          dispatch({ type: "UPDATE_ELEMENTS", updates: resizePatches(gesture, canvasPoint, e.shiftKey, measureDomTextSize), reanchor: true });
           break;
 
         case "creating":
@@ -916,8 +908,6 @@ export function useCanvasInteraction(
       gesture,
       viewport,
       dispatch,
-      continueDrag,
-      continueResize,
       tool,
       arrowStart,
       updatePreview,
@@ -941,7 +931,7 @@ export function useCanvasInteraction(
           break;
 
         case "dragging": {
-          endDrag();
+          dispatch({ type: "END_HISTORY" });
           // A click (no real drag) on the sole selection opens its text editor
           const editId = clickEditTarget(gesture, { x: e.clientX, y: e.clientY });
           const element = editId && elements.find((el) => el.id === editId);
@@ -950,7 +940,7 @@ export function useCanvasInteraction(
         }
 
         case "resizing":
-          endResize();
+          dispatch({ type: "END_HISTORY" });
           break;
 
         case "creating":
@@ -979,8 +969,6 @@ export function useCanvasInteraction(
     [
       svgRef,
       gesture,
-      endDrag,
-      endResize,
       dispatch,
       elements,
       selectedIds,

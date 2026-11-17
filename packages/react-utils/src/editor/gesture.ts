@@ -3,7 +3,10 @@
  * `useCanvasInteraction` holds one `Gesture`; pointer-up ends any of them.
  */
 import type { Bounds, DiagramElement, Viewport } from "@scribblesvg/core";
-import { boundsFromPoints, HANDLE_CURSORS, type HandlePosition } from "./hit-test";
+import { boundsFromPoints, HANDLE_CURSORS } from "./hit-test";
+
+import type { DragSession } from "./drag";
+import type { ResizeSession } from "./resize";
 
 type Point = { x: number; y: number };
 
@@ -21,8 +24,8 @@ export type PendingEdit = { elementId: string; screenStart: Point };
 export type Gesture =
   | { type: "none" }
   | { type: "panning"; screenStart: Point; viewportStart: Point }
-  | { type: "dragging"; pendingEdit: PendingEdit | null }
-  | { type: "resizing"; handle: HandlePosition }
+  | ({ type: "dragging"; pendingEdit: PendingEdit | null } & DragSession)
+  | ({ type: "resizing" } & ResizeSession)
   /** Click-drag out the size of a just-added element. */
   | { type: "creating"; elementType: CreationType; elementId: string; startPoint: Point }
   | {

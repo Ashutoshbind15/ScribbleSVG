@@ -13,6 +13,13 @@ import {
   type Gesture,
 } from "../packages/react-utils/src/editor/gesture.ts";
 
+const dragSession = { startCanvasPoint: { x: 0, y: 0 }, originalElements: [] };
+const resizeSession = {
+  kind: "group" as const, ids: new Set<string>(), startCanvasPoint: { x: 0, y: 0 },
+  startBounds: { x: 0, y: 0, width: 100, height: 100 },
+  anchor: { x: 0, y: 0 }, minScale: 0.2, originalElements: [],
+};
+
 const marquee: Gesture = {
   type: "marqueeing",
   startPoint: { x: 10, y: 10 },
@@ -28,7 +35,7 @@ test("the marquee follows the pointer and its bounds are derived from it", () =>
 });
 
 test("moving the pointer only changes a marquee", () => {
-  const dragging: Gesture = { type: "dragging", pendingEdit: null };
+  const dragging: Gesture = { type: "dragging", ...dragSession, pendingEdit: null };
   assert.equal(moveMarquee(dragging, { x: 1, y: 1 }), dragging);
   assert.equal(moveMarquee(IDLE, { x: 1, y: 1 }), IDLE);
 });
@@ -40,7 +47,7 @@ test("Escape drops a marquee until release and leaves other gestures alone", () 
   assert.equal(moveMarquee(cancelled, { x: 60, y: 60 }), cancelled);
   assert.equal(gestureCursor(cancelled), "crosshair");
 
-  const resizing: Gesture = { type: "resizing", handle: "nw" };
+  const resizing: Gesture = { type: "resizing", ...resizeSession, handle: "nw" };
   assert.equal(cancelMarquee(resizing), resizing);
   assert.equal(cancelMarquee(IDLE), IDLE);
 });
@@ -90,16 +97,16 @@ test("creating a circle sets its radius from the start point", () => {
 });
 
 test("a drag's release opens the text editor only for a click on the sole selection", () => {
-  const press = { type: "dragging" as const, pendingEdit: { elementId: "a", screenStart: { x: 0, y: 0 } } };
+  const press = { type: "dragging" as const, ...dragSession, pendingEdit: { elementId: "a", screenStart: { x: 0, y: 0 } } };
   assert.equal(clickEditTarget(press, { x: 1, y: 1 }), "a");
   assert.equal(clickEditTarget(press, { x: CLICK_SLOP_PX, y: 0 }), null);
-  assert.equal(clickEditTarget({ type: "dragging", pendingEdit: null }, { x: 0, y: 0 }), null);
+  assert.equal(clickEditTarget({ type: "dragging", ...dragSession, pendingEdit: null }, { x: 0, y: 0 }), null);
 });
 
 test("each gesture sets its cursor; idle and creating defer to the tool", () => {
   assert.equal(gestureCursor({ type: "panning", screenStart: { x: 0, y: 0 }, viewportStart: { x: 0, y: 0 } }), "grabbing");
-  assert.equal(gestureCursor({ type: "resizing", handle: "e" }), "ew-resize");
-  assert.equal(gestureCursor({ type: "dragging", pendingEdit: null }), "move");
+  assert.equal(gestureCursor({ type: "resizing", ...resizeSession, handle: "e" }), "ew-resize");
+  assert.equal(gestureCursor({ type: "dragging", ...dragSession, pendingEdit: null }), "move");
   assert.equal(gestureCursor(marquee), "crosshair");
   assert.equal(gestureCursor(IDLE), null);
   assert.equal(
