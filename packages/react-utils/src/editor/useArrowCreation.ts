@@ -61,9 +61,7 @@ export function useArrowCreation(
         kind === "arrow"
           ? { ...base, type: "arrow" }
           : { ...base, type: "line" };
-      dispatch({ type: "ADD_ELEMENT", element });
-      dispatch({ type: "SET_TOOL", tool: "select" });
-      dispatch({ type: "SET_SELECTION", ids: [element.id] });
+      dispatch({ type: "PLACE_ELEMENT", element });
       setArrowStart(null);
       setPreview(null);
     },

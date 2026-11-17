@@ -108,6 +108,15 @@ Treat catalog SVG as trusted host input (your bundled pack or admin-curated mark
 
 Use `onChange` to keep the document in sync (e.g. save to your backend). The document is plain JSON from `@scribblesvg/core` — see [Document model](/docs/document-model).
 
+## Direct reducer placement
+
+For direct reducer consumers, `PLACE_ELEMENT` adds an element, selects it and
+switches to the select tool in one undoable transition. `INSERT_IMAGE` shares
+that placement logic after fitting and validating the image.
+`SELECT_ELEMENT` selects an existing id and switches tools without changing
+the document or adding history. Creation and subsequent size/text updates can
+share a `BEGIN_HISTORY` / `END_HISTORY` group.
+
 ## Images
 
 Pass `onRequestImage` to `DiagramCanvas` to show the Image toolbar button. Return a promise resolving to `{ src, alt? }`, or `null` to cancel. The editor loads and measures the image, then inserts it in the viewport and selects it.

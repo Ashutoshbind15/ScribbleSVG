@@ -424,9 +424,7 @@ export function useCanvasInteraction(
 
       dispatch({ type: "BEGIN_HISTORY" });
       textHistoryOpenRef.current = true;
-      dispatch({ type: "ADD_ELEMENT", element });
-      dispatch({ type: "SET_TOOL", tool: "select" });
-      dispatch({ type: "SET_SELECTION", ids: [elementId] });
+      dispatch({ type: "PLACE_ELEMENT", element });
 
       // Open inline editor immediately; box grows with typed content.
       const size = measureDomTextSize("", fontSize);
@@ -655,9 +653,7 @@ export function useCanvasInteraction(
         startPoint: point,
       });
       dispatch({ type: "BEGIN_HISTORY" });
-      dispatch({ type: "ADD_ELEMENT", element });
-      dispatch({ type: "SET_TOOL", tool: "select" });
-      dispatch({ type: "SET_SELECTION", ids: [element.id] });
+      dispatch({ type: "PLACE_ELEMENT", element });
       svg.setPointerCapture(e.pointerId);
     },
     [dispatch],
@@ -778,8 +774,7 @@ export function useCanvasInteraction(
           e.preventDefault();
           const hitElement = hitTestTextTarget(canvasPoint, targets, viewport.zoom);
           if (hitElement) {
-            dispatch({ type: "SET_TOOL", tool: "select" });
-            dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
+            dispatch({ type: "SELECT_ELEMENT", id: hitElement.id });
             openTextEditor(hitElement);
           } else {
             createTextAt(canvasPoint);

@@ -198,3 +198,22 @@ test("INSERT_IMAGE skips an image that fails validation", () => {
   });
   assert.equal(next, state);
 });
+
+for (const grouped of [false, true]) {
+  test(`placement restores elements and selection on undo (grouped=${grouped})`, () => {
+    const initial = stateWith({ selectedIds: new Set([rect.id]), tool: "rectangle" });
+    let state = grouped ? canvasReducer(initial, { type: "BEGIN_HISTORY" }) : initial;
+    state = canvasReducer(state, { type: "PLACE_ELEMENT", element: { ...rect, id: "new" } });
+    assert.equal(state.tool, "select");
+    assert.deepEqual([...state.selectedIds], ["new"]);
+    if (grouped) {
+      state = canvasReducer(state, { type: "UPDATE_ELEMENT", id: "new", patch: { x: 100 } });
+      state = canvasReducer(state, { type: "END_HISTORY" });
+    }
+    assert.equal(state.past.length, 1);
+    state = canvasReducer(state, { type: "UNDO" });
+    assert.deepEqual(state.document.elements, initial.document.elements);
+    assert.deepEqual(state.selectedIds, initial.selectedIds);
+    assert.deepEqual([...canvasReducer(state, { type: "REDO" }).selectedIds], ["new"]);
+  });
+}

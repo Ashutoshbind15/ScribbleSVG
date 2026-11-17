@@ -78,6 +78,8 @@ export type CanvasAction =
       type: "INSERT_IMAGE";
       image: Omit<ImageElement, "x" | "y" | "width" | "height">;
     }
+  | { type: "PLACE_ELEMENT"; element: DiagramElement }
+  | { type: "SELECT_ELEMENT"; id: string }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
   | {
       type: "ADD_ELEMENTS";
@@ -246,17 +248,25 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
       };
       // Never let a bad host result into the document.
       if (!isDiagramElement(element)) return state;
-      return withHistory(state, {
+      return canvasReducer(state, { type: "PLACE_ELEMENT", element });
+    }
+
+    case "SELECT_ELEMENT":
+      return {
         ...state,
-        document: {
-          ...state.document,
-          elements: [...state.document.elements, element],
-        },
-        selectedIds: new Set([element.id]),
         tool: "select",
         activeIconId: null,
+        selectedIds: new Set([action.id]),
+      };
+
+    case "PLACE_ELEMENT":
+      return withHistory(state, {
+        ...canvasReducer(state, { type: "SELECT_ELEMENT", id: action.element.id }),
+        document: {
+          ...state.document,
+          elements: [...state.document.elements, action.element],
+        },
       });
-    }
 
     case "ADD_ELEMENT":
       return withHistory(state, {

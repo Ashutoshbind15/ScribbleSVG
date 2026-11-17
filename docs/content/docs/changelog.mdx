@@ -39,6 +39,8 @@ Editor state in one place, for direct users of the reducer and hooks (`DiagramCa
 - New reducer actions for events that used to read refs: `ZOOM_AT` (wheel and pinch zoom around the pointer), `PAN_BY` (wheel scroll) and `INSERT_IMAGE` (place, select and switch to the select tool in one step). Quick wheel events between renders now all count instead of some reading a stale viewport
 - **Breaking for direct `useCanvasInteraction` users:** the hook reads the canvas size from `state.size`, so its `containerSize` argument is gone: call `useCanvasInteraction(state, dispatch, svgRef, icons)`
 
+- Placement uses one `PLACE_ELEMENT` transition (also shared by `INSERT_IMAGE`); `SELECT_ELEMENT` selects an existing element and switches tools. Undo restores the previous elements and selection, including grouped creation.
+
 ## 0.2.3 / 0.2.6
 
 Editor and geometry improvements:
