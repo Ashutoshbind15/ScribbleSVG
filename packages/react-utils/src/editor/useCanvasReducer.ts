@@ -1,10 +1,16 @@
 import { useReducer } from "react";
 import {
   EMPTY_DOCUMENT,
+  getContentBounds,
+  isDiagramElement,
   type DiagramDocument,
   type DiagramElement,
+  type ImageElement,
   type Viewport,
 } from "@scribblesvg/core";
+import { screenToCanvas } from "./coordinate-utils";
+import { fitImageToViewport } from "./image-fit";
+import { fitViewport, zoomAround } from "./zoom";
 
 // ── Tool types ──
 
@@ -44,6 +50,10 @@ export interface CanvasState {
    * Use BEGIN_HISTORY / END_HISTORY to group a gesture into one undo step.
    */
   historyBatchDepth: number;
+  /** Canvas size in screen pixels. A guess until the first `RESIZE`. */
+  size: { width: number; height: number };
+  /** Fit the content to the first non-empty `RESIZE` (the `fitOnLoad` prop). */
+  fitPending: boolean;
 }
 
 // ── Actions ──
@@ -52,6 +62,22 @@ export type CanvasAction =
   | { type: "SET_DOCUMENT"; document: DiagramDocument }
   | { type: "SET_TOOL"; tool: ToolType; activeIconId?: string | null }
   | { type: "SET_VIEWPORT"; viewport: Viewport }
+  | { type: "RESIZE"; size: { width: number; height: number } }
+  /**
+   * Zoom by `factor`, keeping the canvas point under `screenPoint` (pixels
+   * from the canvas's top-left) in place.
+   */
+  | { type: "ZOOM_AT"; factor: number; screenPoint: { x: number; y: number } }
+  /** Scroll the viewport by screen pixels. */
+  | { type: "PAN_BY"; dx: number; dy: number }
+  /**
+   * Add an image centred in the viewport, select it and switch to the select
+   * tool. An image that fails validation is skipped.
+   */
+  | {
+      type: "INSERT_IMAGE";
+      image: Omit<ImageElement, "x" | "y" | "width" | "height">;
+    }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
   | {
       type: "ADD_ELEMENTS";
@@ -156,6 +182,81 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
         ...state,
         document: { ...state.document, viewport: action.viewport },
       };
+
+    case "RESIZE": {
+      const { size } = action;
+      if (state.fitPending && size.width > 0 && size.height > 0) {
+        return {
+          ...state,
+          size,
+          fitPending: false,
+          document: {
+            ...state.document,
+            viewport: fitViewport(getContentBounds(state.document.elements), size),
+          },
+        };
+      }
+      if (size.width === state.size.width && size.height === state.size.height) {
+        return state;
+      }
+      return { ...state, size };
+    }
+
+    case "ZOOM_AT": {
+      const { viewport } = state.document;
+      const anchor = screenToCanvas(
+        action.screenPoint.x,
+        action.screenPoint.y,
+        viewport,
+        state.size,
+      );
+      return {
+        ...state,
+        document: {
+          ...state.document,
+          viewport: zoomAround(viewport, viewport.zoom * action.factor, anchor),
+        },
+      };
+    }
+
+    case "PAN_BY": {
+      const { viewport } = state.document;
+      return {
+        ...state,
+        document: {
+          ...state.document,
+          viewport: {
+            ...viewport,
+            x: viewport.x + action.dx / viewport.zoom,
+            y: viewport.y + action.dy / viewport.zoom,
+          },
+        },
+      };
+    }
+
+    case "INSERT_IMAGE": {
+      const { image } = action;
+      const element: ImageElement = {
+        ...image,
+        ...fitImageToViewport(
+          { width: image.naturalWidth, height: image.naturalHeight },
+          state.document.viewport,
+          state.size,
+        ),
+      };
+      // Never let a bad host result into the document.
+      if (!isDiagramElement(element)) return state;
+      return withHistory(state, {
+        ...state,
+        document: {
+          ...state.document,
+          elements: [...state.document.elements, element],
+        },
+        selectedIds: new Set([element.id]),
+        tool: "select",
+        activeIconId: null,
+      });
+    }
 
     case "ADD_ELEMENT":
       return withHistory(state, {
@@ -310,12 +411,22 @@ const INITIAL_STATE: CanvasState = {
   past: [],
   future: [],
   historyBatchDepth: 0,
+  size: { width: 800, height: 600 },
+  fitPending: false,
 };
 
-export function useCanvasReducer(initialDoc?: DiagramDocument) {
+/**
+ * Editor state for `initialDoc`. With `fitOnLoad`, the first real canvas
+ * size (`RESIZE`) also frames the document's content.
+ */
+export function useCanvasReducer(
+  initialDoc?: DiagramDocument,
+  { fitOnLoad = false }: { fitOnLoad?: boolean } = {},
+) {
   return useReducer(canvasReducer, {
     ...INITIAL_STATE,
     document: initialDoc ?? EMPTY_DOCUMENT,
+    fitPending: fitOnLoad,
   });
 }
 

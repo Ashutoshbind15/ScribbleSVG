@@ -7,16 +7,13 @@ import {
   getElementBounds,
   generateSeed,
   isConnector,
-  isDiagramElement,
   isLabeledShape,
   type Bounds,
   type DiagramDocument,
-  type ImageElement,
 } from "@scribblesvg/core";
-import { fitImageToViewport, measureImage } from "./image-fit";
+import { measureImage } from "./image-fit";
 import { useCanvasReducer } from "./useCanvasReducer";
 import { getViewBox } from "./coordinate-utils";
-import { screenToCanvas } from "./coordinate-utils";
 import { ElementRenderer } from "./ElementRenderer";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { MarqueeOverlay } from "./MarqueeOverlay";
@@ -96,20 +93,13 @@ export function DiagramCanvas({
   autoFocus = false,
   fitOnLoad = false,
 }: DiagramCanvasProps) {
-  const [state, dispatch] = useCanvasReducer(initialDocument);
+  const [state, dispatch] = useCanvasReducer(initialDocument, { fitOnLoad });
   const svgRef = useRef<SVGSVGElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const catalog = useMemo(() => partitionIconCatalog(icons), [icons]);
-
-  // Container dimensions for viewBox computation
-  const [size, setSize] = useState({ width: 800, height: 600 });
-
-  /** fitOnLoad waits for the first real measurement (the default is a guess). */
-  const fitPendingRef = useRef(fitOnLoad);
-  const elementsRef = useRef(state.document.elements);
-  elementsRef.current = state.document.elements;
+  const { size } = state;
 
   // ── Resize observer ──
   useEffect(() => {
@@ -119,21 +109,8 @@ export function DiagramCanvas({
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
-        const measured = {
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        };
-        setSize(measured);
-        if (fitPendingRef.current && measured.width > 0 && measured.height > 0) {
-          fitPendingRef.current = false;
-          dispatch({
-            type: "SET_VIEWPORT",
-            viewport: fitViewport(
-              getContentBounds(elementsRef.current),
-              measured,
-            ),
-          });
-        }
+        const { width, height } = entry.contentRect;
+        dispatch({ type: "RESIZE", size: { width, height } });
       }
     });
     observer.observe(container);
@@ -178,7 +155,7 @@ export function DiagramCanvas({
     stepEditingFontSize,
     updateEditingLayout,
     updateEditingText,
-  } = useCanvasInteraction(state, dispatch, svgRef, size, catalog.valid);
+  } = useCanvasInteraction(state, dispatch, svgRef, catalog.valid);
 
   const [helpOpen, setHelpOpen] = useState(false);
   // Detected after mount so server and first client render agree.
@@ -338,78 +315,51 @@ export function DiagramCanvas({
 
   const modKeyHeld = useHeldModifiers();
 
-  // ── Wheel zoom (native listener for non-passive preventDefault) ──
-  // Store latest values in refs so the native listener always sees current state
-  const viewportRef = useRef(state.document.viewport);
-  viewportRef.current = state.document.viewport;
-  const sizeRef = useRef(size);
-  sizeRef.current = size;
-
   /**
    * Asks the host for an image and inserts it centred in the viewport.
    * Cancelled, unloadable or invalid images are skipped; the host reports its own errors.
    */
   const insertRequestedImage = async () => {
     const result = await onRequestImage?.().catch(() => null);
-    const size = result && (await measureImage(result.src));
-    if (!result || !size) return;
+    const natural = result && (await measureImage(result.src));
+    if (!result || !natural) return;
 
-    const element: ImageElement = {
-      type: "image",
-      id: crypto.randomUUID(),
-      seed: generateSeed(),
-      src: result.src,
-      naturalWidth: size.width,
-      naturalHeight: size.height,
-      ...(result.alt ? { alt: result.alt } : {}),
-      ...fitImageToViewport(size, viewportRef.current, sizeRef.current),
-    };
-    // Never let a bad host result into the document.
-    if (isDiagramElement(element)) {
-      dispatch({ type: "ADD_ELEMENTS", elements: [element], select: true });
-      dispatch({ type: "SET_TOOL", tool: "select" });
-    }
+    dispatch({
+      type: "INSERT_IMAGE",
+      image: {
+        type: "image",
+        id: crypto.randomUUID(),
+        seed: generateSeed(),
+        src: result.src,
+        naturalWidth: natural.width,
+        naturalHeight: natural.height,
+        ...(result.alt ? { alt: result.alt } : {}),
+      },
+    });
   };
-  const dispatchRef = useRef(dispatch);
-  dispatchRef.current = dispatch;
 
+  // ── Wheel zoom (native listener for non-passive preventDefault) ──
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
 
     const applyZoom = (e: WheelEvent, sensitivity: number) => {
-      const viewport = viewportRef.current;
-      const currentSize = sizeRef.current;
       const rect = svg.getBoundingClientRect();
-      const pointerScreenX = e.clientX - rect.left;
-      const pointerScreenY = e.clientY - rect.top;
-
-      // The canvas point under the cursor stays under it.
-      const anchor = screenToCanvas(
-        pointerScreenX,
-        pointerScreenY,
-        viewport,
-        { width: currentSize.width, height: currentSize.height },
-      );
-
       const rawDelta =
         e.deltaMode === 1
           ? e.deltaY * 16
           : e.deltaMode === 2
             ? e.deltaY * 800
             : e.deltaY;
-      const newZoom = viewport.zoom * Math.exp(-rawDelta * sensitivity);
-
-      dispatchRef.current({
-        type: "SET_VIEWPORT",
-        viewport: zoomAround(viewport, newZoom, anchor),
+      dispatch({
+        type: "ZOOM_AT",
+        factor: Math.exp(-rawDelta * sensitivity),
+        screenPoint: { x: e.clientX - rect.left, y: e.clientY - rect.top },
       });
     };
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-
-      const viewport = viewportRef.current;
 
       // ctrlKey on the event: pinch (synthetic) or Ctrl/Cmd+scroll (physical).
       if (e.ctrlKey || e.metaKey) {
@@ -426,20 +376,12 @@ export function DiagramCanvas({
         return;
       }
 
-      const scale = 1;
-      dispatchRef.current({
-        type: "SET_VIEWPORT",
-        viewport: {
-          ...viewport,
-          x: viewport.x + (e.deltaX * scale) / viewport.zoom,
-          y: viewport.y + (e.deltaY * scale) / viewport.zoom,
-        },
-      });
+      dispatch({ type: "PAN_BY", dx: e.deltaX, dy: e.deltaY });
     };
 
     svg.addEventListener("wheel", handleWheel, { passive: false });
     return () => svg.removeEventListener("wheel", handleWheel);
-  }, []); // svgRef and modKeyHeld are stable; refs handle changing state
+  }, [dispatch, modKeyHeld]);
 
   const viewBox = getViewBox(state.document.viewport, size.width, size.height);
 
