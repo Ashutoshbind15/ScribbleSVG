@@ -28,6 +28,9 @@ export function dragPatches(drag: DragSession, point: Point) {
           endX: el.endX + dx, endY: el.endY + dy,
         };
         break;
+      case "freedraw":
+        patch = { points: el.points.map(([x, y]) => [x + dx, y + dy]) };
+        break;
       default:
         patch = { x: el.x + dx, y: el.y + dy };
     }
