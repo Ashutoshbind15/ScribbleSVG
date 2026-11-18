@@ -38,13 +38,24 @@ export function getStrokePathData(points: StrokePoint[]): string {
   return d;
 }
 
-/** Axis-aligned box around the stroke's points. */
-export function getStrokeBounds(points: StrokePoint[]): {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-} {
+type StrokeBounds = { x: number; y: number; width: number; height: number };
+
+const boundsCache = new WeakMap<readonly StrokePoint[], StrokeBounds>();
+
+/**
+ * Axis-aligned box around the stroke's points. Cached per points array, so
+ * an edited stroke must get a new array rather than be changed in place.
+ */
+export function getStrokeBounds(points: StrokePoint[]): StrokeBounds {
+  let bounds = boundsCache.get(points);
+  if (!bounds) {
+    bounds = measureStroke(points);
+    boundsCache.set(points, bounds);
+  }
+  return { ...bounds };
+}
+
+function measureStroke(points: StrokePoint[]): StrokeBounds {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;

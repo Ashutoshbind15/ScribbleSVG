@@ -70,6 +70,14 @@ describe("freedraw elements", () => {
     assert.deepEqual(getElementConnectionPoints(el), []);
   });
 
+  test("bounds follow moved points and ignore changes to a returned box", () => {
+    const el = stroke([[0, 0], [10, 20]]);
+    const bounds = getElementBounds(el);
+    bounds.width = 999;
+    assert.deepEqual(getElementBounds(el), { x: 0, y: 0, width: 10, height: 20 });
+    assert.deepEqual(getElementBounds(translateElement(el, 5, 5)), { x: 5, y: 5, width: 10, height: 20 });
+  });
+
   test("selects on the ink, not the empty box around it", () => {
     const el = stroke([[0, 0], [100, 100]]);
     assert.equal(hitTestSelection({ x: 50, y: 52 }, [el], 1), el);
