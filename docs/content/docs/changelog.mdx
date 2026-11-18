@@ -23,6 +23,13 @@ Freehand pencil:
 - `PLACE_ELEMENT` takes an optional `select` (default true). With `select: false` it clears the selection and keeps the current tool, which is how each pencil stroke is placed.
 - **Behaviour change for embedders:** `DiagramElement` and `ToolType` each gain a member (`freedraw`, `pencil`), so an exhaustive `switch` over either needs a new case. `isBindable` now returns false for strokes. `CanvasState` gains `pencilSmoothing`.
 
+Element groups:
+
+- Elements can be grouped: new optional `groupId` on every element, validated by core. Documents without it load as before
+- Ctrl/⌘ + G groups the selection (merging any groups in it) and Ctrl/⌘ + Shift + G ungroups it, each one undo step
+- Clicking, Shift-clicking or box-selecting a member selects its whole group; double-clicking a member of the selected group selects just that member, and the next click edits its text
+- Pasting a group gives the copy its own new group
+
 Keyboard shortcuts are scoped to the focused editor:
 
 - **Behaviour change for embedders:** shortcuts no longer work without focus. They used to listen on `window`, so keys typed anywhere on the page (a form field, a second editor) could edit the diagram. Now they only apply while focus is inside the editor; pressing the canvas or a toolbar button gives it focus.

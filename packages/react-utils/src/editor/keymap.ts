@@ -24,6 +24,8 @@ export type Command =
   | { type: "cut" }
   | { type: "paste" }
   | { type: "delete" }
+  | { type: "group" }
+  | { type: "ungroup" }
   | { type: "fontStep"; direction: 1 | -1 }
   | { type: "cancelGesture" }
   | { type: "toggleHelp" }
@@ -52,6 +54,8 @@ const PREVENT_DEFAULT: Record<Command["type"], boolean | "ifHandled"> = {
   cut: true,
   paste: true,
   delete: true,
+  group: "ifHandled",
+  ungroup: "ifHandled",
   fontStep: true,
   cancelGesture: false,
   toggleHelp: true,
@@ -194,6 +198,22 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     id: "paste",
     help: { label: "Paste", keys: (a) => [modLabel(a), "V"] },
     resolve: modLetter("v", { type: "paste" }),
+  },
+  {
+    id: "group",
+    help: { label: "Group selection", keys: (a) => [modLabel(a), "G"] },
+    resolve: (e, ctx) =>
+      ctx.hasSelection && modChord(e, ctx) && !e.shiftKey && e.key.toLowerCase() === "g"
+        ? { type: "group" }
+        : null,
+  },
+  {
+    id: "ungroup",
+    help: { label: "Ungroup", keys: (a) => [modLabel(a), "Shift", "G"] },
+    resolve: (e, ctx) =>
+      ctx.hasSelection && modChord(e, ctx) && e.shiftKey && e.key.toLowerCase() === "g"
+        ? { type: "ungroup" }
+        : null,
   },
   {
     id: "undo",

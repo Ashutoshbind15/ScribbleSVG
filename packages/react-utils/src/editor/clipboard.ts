@@ -138,15 +138,20 @@ function remapConnectorBindings(
 
 /**
  * Deep-clone clipboard elements with new ids/seeds, remapped bindings, and a
- * paste offset. Bindings that point outside the pasted set are dropped.
+ * paste offset. Bindings that point outside the pasted set are dropped. Each
+ * group gets a new groupId, so a pasted copy is a group of its own.
  */
 export function cloneElementsForPaste(
   elements: DiagramElement[],
   offset: { x: number; y: number } = { x: PASTE_OFFSET, y: PASTE_OFFSET },
 ): DiagramElement[] {
   const idMap = new Map<string, string>();
+  const groupMap = new Map<string, string>();
   for (const el of elements) {
     idMap.set(el.id, crypto.randomUUID());
+    if (el.groupId !== undefined && !groupMap.has(el.groupId)) {
+      groupMap.set(el.groupId, crypto.randomUUID());
+    }
   }
 
   return elements.map((el) => {
@@ -155,6 +160,7 @@ export function cloneElementsForPaste(
         ...cloneElement(el),
         id: idMap.get(el.id)!,
         seed: generateSeed(),
+        ...(el.groupId !== undefined ? { groupId: groupMap.get(el.groupId)! } : {}),
       },
       offset.x,
       offset.y,

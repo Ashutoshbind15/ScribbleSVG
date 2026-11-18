@@ -59,6 +59,7 @@ import {
   setEditorClipboard,
   writeSystemClipboard,
 } from "./clipboard";
+import { expandToGroups, isWholeGroupSelected } from "./groups";
 
 // ── Default element sizes ──
 const DEFAULT_RECT_SIZE = { width: 150, height: 80 };
@@ -687,14 +688,17 @@ export function useCanvasInteraction(
       } else if (hitElement) {
         e.stopPropagation();
         const alreadySelected = selectedIds.has(hitElement.id);
+        const hitGroup = expandToGroups(targets, [hitElement.id]);
         let pendingEdit: PendingEdit | null = null;
         if (e.shiftKey) {
           const next = new Set(selectedIds);
-          if (alreadySelected) next.delete(hitElement.id);
-          else next.add(hitElement.id);
+          for (const id of hitGroup) {
+            if (alreadySelected) next.delete(id);
+            else next.add(id);
+          }
           dispatch({ type: "SET_SELECTION", ids: Array.from(next) });
         } else if (!alreadySelected) {
-          dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
+          dispatch({ type: "SET_SELECTION", ids: hitGroup });
         } else if (!editingTarget && selectedIds.size === 1) {
           // Clicking the sole selection again edits its text (on release)
           pendingEdit = {
@@ -703,7 +707,7 @@ export function useCanvasInteraction(
           };
         }
         dispatch({ type: "BEGIN_HISTORY" });
-        beginGesture({ type: "dragging", pendingEdit, ...startDrag(elements, alreadySelected ? Array.from(selectedIds) : [hitElement.id], point) });
+        beginGesture({ type: "dragging", pendingEdit, ...startDrag(elements, alreadySelected ? Array.from(selectedIds) : hitGroup, point) });
       } else if (!e.shiftKey && hitTestGroupSelection(point, targets, selectedIds)) {
         // Empty space inside a multi-selection's group box drags the group
         e.stopPropagation();
@@ -849,9 +853,16 @@ export function useCanvasInteraction(
 
       e.preventDefault();
       e.stopPropagation();
+
+      // Double-clicking a member of the selected group selects just that member
+      const hitElement = hitTestSelection(canvasPoint, elements, viewport.zoom, selectedIds);
+      if (hitElement && isWholeGroupSelected(elements, selectedIds, hitElement.id)) {
+        dispatch({ type: "SET_SELECTION", ids: [hitElement.id] });
+        return;
+      }
       createTextAt(canvasPoint);
     },
-    [svgRef, viewport, canvasSize, tool, createTextAt, editingTarget],
+    [svgRef, viewport, canvasSize, tool, createTextAt, editingTarget, elements, selectedIds, dispatch],
   );
 
   // ── Pointer move on SVG: continue the active gesture, or update hover feedback ──

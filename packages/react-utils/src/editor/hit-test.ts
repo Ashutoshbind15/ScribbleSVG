@@ -10,6 +10,7 @@ import {
   type DiagramElement,
   type FreedrawElement,
 } from "@scribblesvg/core";
+import { expandToGroups } from "./groups";
 
 /**
  * Hit-test threshold for connectors (distance in canvas-space pixels).
@@ -454,7 +455,8 @@ export type MarqueeSelectionResult =
 
 /**
  * Resolve what the selection should become after a marquee gesture ends.
- * Pure: click-vs-drag, additive union, and intersection hit-testing.
+ * Pure: click-vs-drag, additive union, and intersection hit-testing. Touching
+ * any member of a group selects the whole group.
  */
 export function resolveMarqueeSelection(args: {
   startPoint: { x: number; y: number };
@@ -485,14 +487,17 @@ export function resolveMarqueeSelection(args: {
     return additive ? { type: "keep" } : { type: "clear" };
   }
 
-  const hits = hitTestMarquee(boundsFromPoints(startPoint, endPoint), elements);
+  const hits = expandToGroups(
+    elements,
+    hitTestMarquee(boundsFromPoints(startPoint, endPoint), elements).map((el) => el.id),
+  );
   if (additive) {
     const next = new Set(selectedIds);
-    for (const el of hits) next.add(el.id);
+    for (const id of hits) next.add(id);
     return { type: "set", ids: Array.from(next) };
   }
 
-  return { type: "set", ids: hits.map((el) => el.id) };
+  return { type: "set", ids: hits };
 }
 
 function elementIntersectsMarquee(
