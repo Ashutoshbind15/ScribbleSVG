@@ -33,6 +33,16 @@ Use `EMPTY_DOCUMENT` from `@scribblesvg/core` as a starting point. Validate untr
 
 All elements share `id` (UUID) and `seed` (Rough.js determinism). Shapes store geometry (`x`/`y`/`width`/`height` or `cx`/`cy`/`radius`) and optional `text` / `fontSize`. Standalone `text` elements may also store `width` / `height` synced from the editor’s real glyph metrics; when omitted, core falls back to `measureTextSize`.
 
+## Groups
+
+Any element may carry an optional `groupId`. Elements that share one are a group: the editor selects, moves and scales them together.
+
+```ts
+groupId?: string; // shared by every member; omit when ungrouped
+```
+
+Groups are flat (no nesting), and a `groupId` held by only one element has no effect. Rendering ignores it, so grouping never changes how a document looks.
+
 ## Connectors
 
 Arrows and lines use canvas endpoints (`startX`/`startY`/`endX`/`endY`) plus optional bindings:

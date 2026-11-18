@@ -84,7 +84,7 @@ The viewport (pan and zoom) is saved in the document and reported through `onCha
 
 ## Keyboard and focus
 
-Shortcuts (undo/redo, copy/cut/paste, Delete, Space-pan, Shift-snap, text size, zoom, Escape, `?` for the shortcuts panel) only reach the editor while focus is inside it. Keys typed elsewhere on your page, such as in a form field or in a second editor, never change the diagram.
+Shortcuts (undo/redo, copy/cut/paste, Delete, group/ungroup, Space-pan, Shift-snap, text size, zoom, Escape, `?` for the shortcuts panel) only reach the editor while focus is inside it. Keys typed elsewhere on your page, such as in a form field or in a second editor, never change the diagram.
 
 - The canvas is focusable (`tabIndex={0}`) and shows a focus ring only for keyboard focus (`:focus-visible`).
 - Pressing anywhere in the editor, including toolbar buttons and the zoom card, gives the canvas focus. Tabbing to a toolbar button leaves focus on the button; shortcuts still work there, except Space and Enter, which press the button.
@@ -97,6 +97,22 @@ Pass `autoFocus` to focus the canvas on mount, so shortcuts work before the firs
 ```tsx
 <DiagramCanvas autoFocus onChange={save} />
 ```
+
+## Groups
+
+Group elements to select, move and scale them as one. A group is stored as a shared `groupId` on its members (see [Document model](/docs/document-model#groups)).
+
+| Action | Result |
+| --- | --- |
+| Ctrl/⌘ + G with two or more selected | Group them; any groups among them merge into one |
+| Ctrl/⌘ + Shift + G | Ungroup everything selected |
+| Click a member | Select the whole group |
+| Double-click a member while its group is selected | Select only that member |
+| Click it again | Edit its text |
+| Shift + click a member | Add or remove the whole group |
+| Box select touching any member | Select the whole group |
+
+Grouping and ungrouping are one undo step each. When they would change nothing (one element selected, or the selection is already one group), the key is left to the browser. Pasting a group makes a new group, separate from the one copied.
 
 ## Icons
 
