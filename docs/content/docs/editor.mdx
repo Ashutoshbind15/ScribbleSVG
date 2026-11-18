@@ -112,6 +112,8 @@ Group elements to select, move and scale them as one. A group is stored as a sha
 | Shift + click a member | Add or remove the whole group |
 | Box select touching any member | Select the whole group |
 
+A selected group is drawn as one object: a single box with corner handles, without a box around each member. When the selection holds more than one object (several groups, or a group with loose elements), each group gets one dashed box and each loose element its own, inside the selection box.
+
 Grouping and ungrouping are one undo step each. When they would change nothing (one element selected, or the selection is already one group), the key is left to the browser. Pasting a group makes a new group, separate from the one copied.
 
 ## Icons
