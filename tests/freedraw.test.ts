@@ -78,6 +78,13 @@ describe("freedraw elements", () => {
     assert.deepEqual(getElementBounds(translateElement(el, 5, 5)), { x: 5, y: 5, width: 10, height: 20 });
   });
 
+  test("a flat stroke still selects within the margin around its ink", () => {
+    const el = stroke([[0, 0], [100, 0]]);
+    assert.equal(hitTestSelection({ x: 50, y: 4 }, [el], 1), el);
+    assert.equal(hitTestSelection({ x: 104, y: 0 }, [el], 1), el);
+    assert.equal(hitTestSelection({ x: 50, y: 8 }, [el], 1), null);
+  });
+
   test("selects on the ink, not the empty box around it", () => {
     const el = stroke([[0, 0], [100, 100]]);
     assert.equal(hitTestSelection({ x: 50, y: 52 }, [el], 1), el);

@@ -8,6 +8,7 @@ import {
   type Bounds,
   type CylinderElement,
   type DiagramElement,
+  type FreedrawElement,
 } from "@scribblesvg/core";
 
 /**
@@ -194,7 +195,7 @@ export function hitTestOutline(
     case "freedraw":
       return pointNearStroke(
         point,
-        element.points,
+        element,
         Math.max(tolerance, CONNECTOR_HIT_THRESHOLD),
       );
 
@@ -281,7 +282,7 @@ export function hitTestElement(
     case "freedraw":
       return pointNearStroke(
         point,
-        element.points,
+        element,
         CONNECTOR_HIT_THRESHOLD,
       );
   }
@@ -508,7 +509,7 @@ function elementIntersectsMarquee(
       );
 
     case "freedraw":
-      return strokeIntersectsRect(element.points, marquee);
+      return strokeIntersectsRect(element, marquee);
 
     case "icon":
     case "text":
@@ -674,9 +675,15 @@ function rectCorners({ x, y, width, height }: Bounds): { x: number; y: number }[
 
 function pointNearStroke(
   point: { x: number; y: number },
-  points: [number, number][],
+  element: FreedrawElement,
   threshold: number,
 ): boolean {
+  const bounds = getElementBounds(element);
+  if (
+    point.x < bounds.x - threshold || point.x > bounds.x + bounds.width + threshold ||
+    point.y < bounds.y - threshold || point.y > bounds.y + bounds.height + threshold
+  ) return false;
+  const { points } = element;
   if (points.length === 1) {
     const [x, y] = points[0]!;
     return Math.hypot(point.x - x, point.y - y) <= threshold;
@@ -692,7 +699,9 @@ function pointNearStroke(
 }
 
 /** True if any part of the stroke's polyline touches or lies inside `rect`. */
-function strokeIntersectsRect(points: [number, number][], rect: Bounds): boolean {
+function strokeIntersectsRect(element: FreedrawElement, rect: Bounds): boolean {
+  if (!boundsIntersect(getElementBounds(element), rect)) return false;
+  const { points } = element;
   if (points.length === 1) {
     const [x, y] = points[0]!;
     return pointInRect({ x, y }, rect);
