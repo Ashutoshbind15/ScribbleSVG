@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { getElementBounds, type DiagramElement } from "@scribblesvg/core";
+import { getElementBounds, type Bounds, type DiagramElement } from "@scribblesvg/core";
 import type { EditingTarget } from "./InlineTextEditor";
-import { getGroupSelectionBounds } from "./hit-test";
+import { getSelectionOutlines } from "./groups";
+import { getElementsBounds, getGroupSelectionBounds } from "./hit-test";
 
 interface SelectionOverlayProps {
   elements: DiagramElement[];
@@ -11,10 +12,34 @@ interface SelectionOverlayProps {
 }
 
 const PADDING = 4; // extra padding around the bounding box
+const STROKE = "var(--color-primary, #3b82f6)";
+
+function pad(bounds: Bounds, by: number): Bounds {
+  return {
+    x: bounds.x - by,
+    y: bounds.y - by,
+    width: bounds.width + by * 2,
+    height: bounds.height + by * 2,
+  };
+}
+
+function DashedBox({ bounds }: { bounds: Bounds }) {
+  return (
+    <rect
+      {...pad(bounds, PADDING)}
+      fill="none"
+      stroke={STROKE}
+      strokeWidth={1.5}
+      strokeDasharray="6 3"
+      rx={2}
+    />
+  );
+}
 
 /**
- * Renders dashed bounding box overlays for all selected elements, plus a
- * solid group box around a multi-selection (its draggable area).
+ * Draws a solid box around a multi-selection's draggable area, with a dashed
+ * box for each selected element or fully selected group. A single fully
+ * selected group uses the solid box alone.
  * Rendered after all elements so the overlay is always on top.
  */
 export function SelectionOverlay({
@@ -22,8 +47,8 @@ export function SelectionOverlay({
   selectedIds,
   editingTarget = null,
 }: SelectionOverlayProps) {
-  const selectedElements = useMemo(
-    () => elements.filter((el) => selectedIds.has(el.id)),
+  const outlines = useMemo(
+    () => getSelectionOutlines(elements, selectedIds),
     [elements, selectedIds],
   );
 
@@ -32,24 +57,24 @@ export function SelectionOverlay({
     [elements, selectedIds],
   );
 
-  if (selectedElements.length === 0) return null;
+  if (selectedIds.size === 0) return null;
 
   return (
     <g className="selection-overlay" pointerEvents="none">
       {groupBounds && (
         <rect
-          x={groupBounds.x}
-          y={groupBounds.y}
-          width={groupBounds.width}
-          height={groupBounds.height}
-          fill="var(--color-primary, #3b82f6)"
+          {...groupBounds}
+          fill={STROKE}
           fillOpacity={0.04}
-          stroke="var(--color-primary, #3b82f6)"
+          stroke={STROKE}
           strokeWidth={1}
           rx={2}
         />
       )}
-      {selectedElements.map((el) => {
+      {outlines.groups.map((members) => (
+        <DashedBox key={members[0]!.id} bounds={getElementsBounds(members)!} />
+      ))}
+      {outlines.elements.map((el) => {
         // Typing into a shape: the shape itself is context enough
         if (
           editingTarget?.elementId === el.id &&
@@ -68,20 +93,7 @@ export function SelectionOverlay({
                 height: editingTarget.height,
               }
             : getElementBounds(el);
-        return (
-          <rect
-            key={el.id}
-            x={bounds.x - PADDING}
-            y={bounds.y - PADDING}
-            width={bounds.width + PADDING * 2}
-            height={bounds.height + PADDING * 2}
-            fill="none"
-            stroke="var(--color-primary, #3b82f6)"
-            strokeWidth={1.5}
-            strokeDasharray="6 3"
-            rx={2}
-          />
-        );
+        return <DashedBox key={el.id} bounds={bounds} />;
       })}
     </g>
   );

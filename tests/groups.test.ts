@@ -4,6 +4,7 @@ import type { RectangleElement } from "@scribblesvg/core";
 import { isDiagramElement } from "../packages/core/validation.ts";
 import {
   expandToGroups,
+  getSelectionOutlines,
   groupPatches,
   isWholeGroupSelected,
   ungroupPatches,
@@ -137,4 +138,44 @@ test("a pasted group gets a new groupId shared by its copies", () => {
   assert.notEqual(d, "g2");
   assert.equal(c, undefined);
   assert.equal("groupId" in pasted[2]!, false);
+});
+
+function outlineIds(selected: string[], els = elements) {
+  const { elements: loose, groups } = getSelectionOutlines(els, new Set(selected));
+  const ids = (list: { id: string }[]) => list.map((el) => el.id);
+  return {
+    elements: ids(loose),
+    groups: groups.map(ids),
+  };
+}
+
+test("a selection that is exactly one group gets no per-member outlines", () => {
+  assert.deepEqual(outlineIds(["b", "a"]), { elements: [], groups: [] });
+});
+
+test("loose elements are outlined one by one, as before", () => {
+  assert.deepEqual(outlineIds(["c"]), { elements: ["c"], groups: [] });
+  const loose = [rect("x", 0), rect("y", 50)];
+  assert.deepEqual(outlineIds(["x", "y"], loose), { elements: ["x", "y"], groups: [] });
+});
+
+test("several groups, or a group with loose elements, outline each group as one", () => {
+  assert.deepEqual(outlineIds(["a", "b", "d", "e"]), {
+    elements: [],
+    groups: [["a", "b"], ["d", "e"]],
+  });
+  assert.deepEqual(outlineIds(["c", "a", "b"]), {
+    elements: ["c"],
+    groups: [["a", "b"]],
+  });
+});
+
+test("selected members of a partly selected group are outlined as loose elements", () => {
+  assert.deepEqual(outlineIds(["a"]), { elements: ["a"], groups: [] });
+  assert.deepEqual(outlineIds(["a", "c"]), { elements: ["a", "c"], groups: [] });
+});
+
+test("a groupId held by one element outlines it as a loose element", () => {
+  const lone = [rect("a", 0, "g1"), rect("b", 50)];
+  assert.deepEqual(outlineIds(["a"], lone), { elements: ["a"], groups: [] });
 });
