@@ -333,6 +333,8 @@ function previousRows(isApple: boolean): Row[] {
     row("Copy", [mod, "C"]),
     row("Cut", [mod, "X"]),
     row("Paste", [mod, "V"]),
+    row("Group selection", [mod, "G"]),
+    row("Ungroup", [mod, "Shift", "G"]),
     row("Undo", [mod, "Z"]),
     row("Redo", [mod, "Shift", "Z"], isApple ? undefined : ["Ctrl", "Y"]),
     row("Delete selection", ["Del"], ["Backspace"]),
@@ -422,4 +424,21 @@ test("releasing Space ends panning even from a text field, without blocking it",
     ran: [{ type: "panRelease" }],
     prevented: false,
   });
+});
+
+test("Mod+G groups and Mod+Shift+G ungroups, only with a selection", () => {
+  const shiftG = key("G", "KeyG", { ...ctrl, shiftKey: true });
+  assert.deepEqual(resolveShortcut(key("g", "KeyG", ctrl), selected), { type: "group" });
+  assert.deepEqual(resolveShortcut(key("g", "KeyG", { metaKey: true }), ctx({ hasSelection: true, isApple: true })), { type: "group" });
+  assert.deepEqual(resolveShortcut(shiftG, selected), { type: "ungroup" });
+  assert.equal(resolveShortcut(key("g", "KeyG", ctrl), ctx()), null);
+  assert.equal(resolveShortcut(key("g", "KeyG", ctrl), ctx({ hasSelection: true, editingText: true })), null);
+});
+
+test("a group key that does nothing leaves the browser default alone", () => {
+  assert.deepEqual(press(key("g", "KeyG", ctrl), selected, { handled: false }), {
+    ran: [{ type: "group" }],
+    prevented: false,
+  });
+  assert.equal(press(key("g", "KeyG", ctrl), selected).prevented, true);
 });

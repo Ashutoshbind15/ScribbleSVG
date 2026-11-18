@@ -34,6 +34,7 @@ import {
 import { useHeldModifiers } from "./useHeldModifiers";
 import { measureDomTextSize } from "./measureDomText";
 import { useCanvasInteraction } from "./useCanvasInteraction";
+import { groupPatches, ungroupPatches } from "./groups";
 import { partitionIconCatalog, type DiagramIcon } from "../icons";
 import { ZoomControls } from "./ZoomControls";
 import { fitViewport, stepZoom, zoomAround } from "./zoom";
@@ -192,6 +193,17 @@ export function DiagramCanvas({
       case "delete":
         handleDelete();
         return true;
+      case "group":
+      case "ungroup": {
+        const { elements } = state.document;
+        const updates =
+          command.type === "group"
+            ? groupPatches(elements, state.selectedIds, crypto.randomUUID())
+            : ungroupPatches(elements, state.selectedIds);
+        if (updates.length === 0) return false;
+        dispatch({ type: "UPDATE_ELEMENTS", updates });
+        return true;
+      }
       case "fontStep":
         stepSelectionFontSize(command.direction);
         return true;

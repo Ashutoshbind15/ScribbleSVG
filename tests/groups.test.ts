@@ -8,6 +8,7 @@ import {
   isWholeGroupSelected,
   ungroupPatches,
 } from "../packages/react-utils/src/editor/groups.ts";
+import { cloneElementsForPaste } from "../packages/react-utils/src/editor/clipboard.ts";
 import { resolveMarqueeSelection } from "../packages/react-utils/src/editor/hit-test.ts";
 import { canvasReducer } from "../packages/react-utils/src/editor/useCanvasReducer.ts";
 
@@ -123,4 +124,17 @@ test("a box touching one member selects its whole group", () => {
     });
   assert.deepEqual(drag(false, []), { type: "set", ids: ["a", "b"] });
   assert.deepEqual(drag(true, ["c"]), { type: "set", ids: ["c", "a", "b"] });
+});
+
+test("a pasted group gets a new groupId shared by its copies", () => {
+  const pasted = cloneElementsForPaste(elements);
+  const [a, b, c, d, e] = pasted.map((el) => el.groupId);
+  assert.ok(a && d);
+  assert.equal(a, b);
+  assert.equal(d, e);
+  assert.notEqual(a, d);
+  assert.notEqual(a, "g1");
+  assert.notEqual(d, "g2");
+  assert.equal(c, undefined);
+  assert.equal("groupId" in pasted[2]!, false);
 });
