@@ -3,7 +3,7 @@ import { test } from "node:test";
 import {
   CLICK_SLOP_PX,
   IDLE,
-  cancelMarquee,
+  cancelOnEscape,
   clickEditTarget,
   creationPatch,
   gestureCursor,
@@ -41,15 +41,15 @@ test("moving the pointer only changes a marquee", () => {
 });
 
 test("Escape drops a marquee until release and leaves other gestures alone", () => {
-  const cancelled = cancelMarquee(moveMarquee(marquee, { x: 50, y: 50 }));
-  assert.deepEqual(cancelled, { type: "marqueeCancelled" });
+  const cancelled = cancelOnEscape(moveMarquee(marquee, { x: 50, y: 50 }));
+  assert.deepEqual(cancelled, { type: "cancelled" });
   assert.equal(getMarqueeBounds(cancelled), null);
   assert.equal(moveMarquee(cancelled, { x: 60, y: 60 }), cancelled);
   assert.equal(gestureCursor(cancelled), "crosshair");
 
   const resizing: Gesture = { type: "resizing", ...resizeSession, handle: "nw" };
-  assert.equal(cancelMarquee(resizing), resizing);
-  assert.equal(cancelMarquee(IDLE), IDLE);
+  assert.equal(cancelOnEscape(resizing), resizing);
+  assert.equal(cancelOnEscape(IDLE), IDLE);
 });
 
 test("panning moves the viewport against the pointer, scaled by zoom", () => {

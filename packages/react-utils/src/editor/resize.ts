@@ -74,12 +74,21 @@ export function resizePatches(resize: ResizeSession, point: Point, freeAspect = 
     const scale = computeGroupScale(resize.startBounds, resize.handle, dx, dy, resize.minScale);
     return getGroupScalePatches(resize.originalElements, resize.anchor, scale);
   }
-  let bounds = computeResizedBounds(resize.startBounds, resize.handle, dx, dy);
+  let bounds = computeResizedBounds(resize.startBounds, resize.handle, dx, dy, minResizeSize(resize));
   if (resize.originalElement.type === "image" && !freeAspect && isCornerHandle(resize.handle)) {
     bounds = lockAspectRatio(resize.startBounds, bounds, resize.handle, MIN_SIZE);
   }
   const patch = boundsToElementPatch(resize.originalElement, bounds, resize.startBounds, resize.handle, measureText);
   return patch ? [{ id: resize.elementId, patch }] : [];
+}
+
+/** A stroke may start smaller than MIN_SIZE (a dot, a tick); it never grows to reach it. */
+function minResizeSize(resize: ResizeState): { width: number; height: number } {
+  if (resize.originalElement.type !== "freedraw") return { width: MIN_SIZE, height: MIN_SIZE };
+  return {
+    width: Math.min(MIN_SIZE, resize.startBounds.width),
+    height: Math.min(MIN_SIZE, resize.startBounds.height),
+  };
 }
 
 /**
@@ -90,6 +99,7 @@ function computeResizedBounds(
   handle: HandlePosition,
   dx: number,
   dy: number,
+  min: { width: number; height: number },
 ): Bounds {
   let { x, y, width, height } = startBounds;
 
@@ -97,32 +107,32 @@ function computeResizedBounds(
   if (handle.includes("w")) {
     const newX = x + dx;
     const newWidth = width - dx;
-    if (newWidth >= MIN_SIZE) {
+    if (newWidth >= min.width) {
       x = newX;
       width = newWidth;
     } else {
-      x = x + width - MIN_SIZE;
-      width = MIN_SIZE;
+      x = x + width - min.width;
+      width = min.width;
     }
   }
   if (handle.includes("e")) {
     const newWidth = width + dx;
-    width = Math.max(MIN_SIZE, newWidth);
+    width = Math.max(min.width, newWidth);
   }
   if (handle.includes("n")) {
     const newY = y + dy;
     const newHeight = height - dy;
-    if (newHeight >= MIN_SIZE) {
+    if (newHeight >= min.height) {
       y = newY;
       height = newHeight;
     } else {
-      y = y + height - MIN_SIZE;
-      height = MIN_SIZE;
+      y = y + height - min.height;
+      height = min.height;
     }
   }
   if (handle.includes("s")) {
     const newHeight = height + dy;
-    height = Math.max(MIN_SIZE, newHeight);
+    height = Math.max(min.height, newHeight);
   }
 
   return { x, y, width, height };
@@ -184,6 +194,20 @@ function boundsToElementPatch(
         width: size.width,
         height: size.height,
         fontSize,
+      };
+    }
+
+    case "freedraw": {
+      // Map each point from the start box into the new one. A flat side
+      // (straight stroke) has no extent to scale, so it just moves.
+      const from = resizeStartBounds;
+      const sizeMap = (v: number, start: number, size: number, next: number, nextSize: number) =>
+        size > 0 ? next + ((v - start) / size) * nextSize : v + (next - start);
+      return {
+        points: original.points.map(([x, y]) => [
+          sizeMap(x, from.x, from.width, bounds.x, bounds.width),
+          sizeMap(y, from.y, from.height, bounds.y, bounds.height),
+        ]),
       };
     }
 

@@ -3,7 +3,7 @@ title: DiagramCanvas
 description: Interactive scribble diagram editor for React
 ---
 
-`DiagramCanvas` is the interactive editor: pan, zoom, shapes, arrows/lines, resize, and text. Hold **Shift** while drawing an arrow or line to snap to 22.5° steps. Standalone text selection and resize follow live glyph metrics so bounds stay tight after font-size changes. Import the bundled CSS once in your CMS or admin app.
+`DiagramCanvas` is the interactive editor: pan, zoom, shapes, arrows/lines, resize, and text. Hold **Shift** while drawing an arrow or line to snap to 22.5° steps. The **pencil** draws freehand strokes and stays active between strokes. While it's active, a toggle beside it switches smoothing on or off: smoothing evens out hand wobble but keeps deliberate corners sharp, so detailed drawings keep their shape. Smoothing starts on each time the editor mounts. Press **Escape** mid-stroke to drop the stroke. Standalone text selection and resize follow live glyph metrics so bounds stay tight after font-size changes. Import the bundled CSS once in your CMS or admin app.
 
 ```tsx
 import "@scribblesvg/react-utils/editor.css";
@@ -111,11 +111,15 @@ Use `onChange` to keep the document in sync (e.g. save to your backend). The doc
 ## Direct reducer placement
 
 For direct reducer consumers, `PLACE_ELEMENT` adds an element, selects it and
-switches to the select tool in one undoable transition. `INSERT_IMAGE` shares
+switches to the select tool in one undoable transition. With `select: false` it
+clears the selection and keeps the tool instead, as the pencil does for each
+stroke. `INSERT_IMAGE` shares
 that placement logic after fitting and validating the image.
 `SELECT_ELEMENT` selects an existing id and switches tools without changing
 the document or adding history. Creation and subsequent size/text updates can
-share a `BEGIN_HISTORY` / `END_HISTORY` group.
+share a `BEGIN_HISTORY` / `END_HISTORY` group. `CANCEL_HISTORY` drops an open group
+instead: the elements and selection go back to how they were at
+`BEGIN_HISTORY`, and no undo step is left.
 
 ## Images
 

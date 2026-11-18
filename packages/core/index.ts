@@ -12,6 +12,7 @@ export type {
   ArrowElement,
   LineElement,
   ConnectorElement,
+  FreedrawElement,
   BindableElement,
   LabeledShapeElement,
   DiagramElement,

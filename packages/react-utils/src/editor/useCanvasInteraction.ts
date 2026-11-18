@@ -11,6 +11,7 @@ import {
   type DiagramDocument,
   type DiagramElement,
   type DiamondElement,
+  type FreedrawElement,
   type IconElement,
   type RectangleElement,
   type TextElement,
@@ -29,7 +30,7 @@ import {
 } from "./hit-test";
 import type { HandlePosition, ConnectionPointHit } from "./hit-test";
 import {
-  cancelMarquee,
+  cancelOnEscape,
   clickEditTarget,
   creationPatch,
   gestureCursor,
@@ -37,10 +38,11 @@ import {
   IDLE,
   moveMarquee,
   panViewport,
-  type CreationType,
+  startCreation,
   type Gesture,
   type PendingEdit,
 } from "./gesture";
+import { startDraw, drawPatch } from "./draw";
 import { startDrag, dragPatches } from "./drag";
 import { startResize, startGroupScale, resizePatches } from "./resize";
 import { useArrowCreation } from "./useArrowCreation";
@@ -131,6 +133,17 @@ function createIconElement(
   };
 }
 
+/** A new pencil stroke, one point long, at `point`. */
+function createFreedrawElement(point: Point, id: string, seed: number): FreedrawElement {
+  return { id, seed, type: "freedraw", points: [[point.x, point.y]] };
+}
+
+/** Every pointer position since the last move. Coalesced samples keep fast strokes from turning into polygons. */
+function pointerSamples(e: React.PointerEvent): PointerEvent[] {
+  const coalesced = e.nativeEvent.getCoalescedEvents?.() ?? [];
+  return coalesced.length > 0 ? coalesced : [e.nativeEvent];
+}
+
 /**
  * The resize handle under `point` for the current selection: the corner
  * handles of a multi-selection's group box, or a single element's box handles.
@@ -175,7 +188,7 @@ export function useCanvasInteraction(
   svgRef: React.RefObject<SVGSVGElement | null>,
   icons?: DiagramIcon[],
 ) {
-  const { document: doc, selectedIds, tool, activeIconId, size: canvasSize } = state;
+  const { document: doc, selectedIds, tool, activeIconId, pencilSmoothing, size: canvasSize } = state;
   const elements = doc.elements;
   const viewport = doc.viewport;
 
@@ -320,9 +333,10 @@ export function useCanvasInteraction(
 
   const cancelGesture = useCallback(() => {
     cancelArrow();
+    if (gesture.type === "drawing") dispatch({ type: "CANCEL_HISTORY" });
     // Pointer-up still ends the gesture and releases capture.
-    setGesture(cancelMarquee);
-  }, [cancelArrow]);
+    setGesture(cancelOnEscape);
+  }, [cancelArrow, gesture.type, dispatch]);
 
   const releaseHeldKeys = useCallback(() => {
     setSpaceHeld(false);
@@ -614,24 +628,22 @@ export function useCanvasInteraction(
     ],
   );
 
-  /** Adds `element` and lets the user click-drag out its size. */
+  /**
+   * Adds `element` and starts `gesture`, which shapes it until release.
+   * `select` is passed to PLACE_ELEMENT.
+   */
   const beginCreation = useCallback(
     (
       e: React.PointerEvent<SVGSVGElement>,
       svg: SVGSVGElement,
-      elementType: CreationType,
+      gesture: Gesture,
       element: DiagramElement,
-      point: Point,
+      select = true,
     ) => {
       e.preventDefault();
-      setGesture({
-        type: "creating",
-        elementType,
-        elementId: element.id,
-        startPoint: point,
-      });
+      setGesture(gesture);
       dispatch({ type: "BEGIN_HISTORY" });
-      dispatch({ type: "PLACE_ELEMENT", element });
+      dispatch({ type: "PLACE_ELEMENT", element, select });
       svg.setPointerCapture(e.pointerId);
     },
     [dispatch],
@@ -766,7 +778,7 @@ export function useCanvasInteraction(
         case "cylinder":
         case "diamond": {
           const element = createShapeElement(tool, canvasPoint, crypto.randomUUID(), generateSeed());
-          beginCreation(e, svg, tool, element, canvasPoint);
+          beginCreation(e, svg, startCreation(tool, element, canvasPoint), element);
           break;
         }
 
@@ -779,9 +791,16 @@ export function useCanvasInteraction(
               crypto.randomUUID(),
               generateSeed(),
             );
-            beginCreation(e, svg, "icon", element, canvasPoint);
+            beginCreation(e, svg, startCreation("icon", element, canvasPoint), element);
           }
           break;
+
+        case "pencil": {
+          const element = createFreedrawElement(canvasPoint, crypto.randomUUID(), generateSeed());
+          const session = startDraw(element, viewport.zoom, pencilSmoothing);
+          beginCreation(e, svg, { type: "drawing", ...session }, element, false);
+          break;
+        }
 
         case "select":
           pressWithSelectTool(e, svg, canvasPoint, targets);
@@ -805,6 +824,7 @@ export function useCanvasInteraction(
       icons,
       beginCreation,
       pressWithSelectTool,
+      pencilSmoothing,
     ],
   );
 
@@ -863,11 +883,19 @@ export function useCanvasInteraction(
           });
           break;
 
+        case "drawing":
+          dispatch({
+            type: "UPDATE_ELEMENT",
+            id: gesture.elementId,
+            patch: drawPatch(gesture, pointerSamples(e).map(getCanvasPoint)),
+          });
+          break;
+
         case "marqueeing":
           setGesture((current) => moveMarquee(current, canvasPoint));
           break;
 
-        case "marqueeCancelled":
+        case "cancelled":
           break;
 
         case "none":
@@ -913,7 +941,7 @@ export function useCanvasInteraction(
 
       switch (gesture.type) {
         case "panning":
-        case "marqueeCancelled":
+        case "cancelled":
           break;
 
         case "dragging": {
@@ -930,6 +958,7 @@ export function useCanvasInteraction(
           break;
 
         case "creating":
+        case "drawing":
           dispatch({ type: "END_HISTORY" });
           break;
 

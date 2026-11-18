@@ -24,7 +24,8 @@ export type ToolType =
   | "icon"
   | "text"
   | "arrow"
-  | "line";
+  | "line"
+  | "pencil";
 
 // ── History ──
 
@@ -44,6 +45,8 @@ export interface CanvasState {
   tool: ToolType;
   /** Catalog iconId used when the icon tool places a new element. */
   activeIconId: string | null;
+  /** Whether new pencil strokes are smoothed (corners are always kept). */
+  pencilSmoothing: boolean;
   past: HistorySnapshot[];
   future: HistorySnapshot[];
   /**
@@ -62,6 +65,7 @@ export interface CanvasState {
 export type CanvasAction =
   | { type: "SET_DOCUMENT"; document: DiagramDocument }
   | { type: "SET_TOOL"; tool: ToolType; activeIconId?: string | null }
+  | { type: "SET_PENCIL_SMOOTHING"; enabled: boolean }
   | { type: "SET_VIEWPORT"; viewport: Viewport }
   | { type: "RESIZE"; size: { width: number; height: number } }
   /**
@@ -79,7 +83,16 @@ export type CanvasAction =
       type: "INSERT_IMAGE";
       image: Omit<ImageElement, "x" | "y" | "width" | "height">;
     }
-  | { type: "PLACE_ELEMENT"; element: DiagramElement }
+  | {
+      type: "PLACE_ELEMENT";
+      element: DiagramElement;
+      /**
+       * Default true: select the element and switch to the select tool.
+       * False clears the selection and keeps the tool, for tools that place
+       * one element after another.
+       */
+      select?: boolean;
+    }
   | { type: "SELECT_ELEMENT"; id: string }
   | { type: "ADD_ELEMENT"; element: DiagramElement }
   | {
@@ -100,6 +113,11 @@ export type CanvasAction =
   | { type: "CLEAR_SELECTION" }
   | { type: "BEGIN_HISTORY" }
   | { type: "END_HISTORY" }
+  /**
+   * Closes every open history batch and puts back the elements and selection
+   * from when it began, leaving no undo step.
+   */
+  | { type: "CANCEL_HISTORY" }
   | { type: "UNDO" }
   | { type: "REDO" };
 
@@ -181,6 +199,9 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
             ? (action.activeIconId ?? state.activeIconId)
             : null,
       };
+
+    case "SET_PENCIL_SMOOTHING":
+      return { ...state, pencilSmoothing: action.enabled };
 
     case "SET_VIEWPORT":
       return {
@@ -264,7 +285,9 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
 
     case "PLACE_ELEMENT":
       return withHistory(state, {
-        ...canvasReducer(state, { type: "SELECT_ELEMENT", id: action.element.id }),
+        ...(action.select === false
+          ? { ...state, selectedIds: new Set<string>() }
+          : canvasReducer(state, { type: "SELECT_ELEMENT", id: action.element.id })),
         document: {
           ...state.document,
           elements: [...state.document.elements, action.element],
@@ -393,6 +416,17 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
       return { ...state, historyBatchDepth: 0 };
     }
 
+    case "CANCEL_HISTORY": {
+      const start = state.past[state.past.length - 1];
+      if (state.historyBatchDepth <= 0 || !start) return state;
+      return {
+        ...state,
+        ...restoreSnapshot(state, start),
+        past: state.past.slice(0, -1),
+        historyBatchDepth: 0,
+      };
+    }
+
     case "UNDO": {
       if (state.past.length === 0 || state.historyBatchDepth > 0) {
         return state;
@@ -431,6 +465,7 @@ const INITIAL_STATE: CanvasState = {
   selectedIds: new Set(),
   tool: "select",
   activeIconId: null,
+  pencilSmoothing: true,
   past: [],
   future: [],
   historyBatchDepth: 0,

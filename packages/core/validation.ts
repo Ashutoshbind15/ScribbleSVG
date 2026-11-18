@@ -56,6 +56,21 @@ function hasOptionalLabel(value: Fields): boolean {
   return isOptionalString(value.text) && isOptionalNumber(value.fontSize);
 }
 
+/** Freehand points: at least one finite `[x, y]` pair. */
+function hasStrokePoints(value: Fields): boolean {
+  return (
+    Array.isArray(value.points) &&
+    value.points.length > 0 &&
+    value.points.every(
+      (point) =>
+        Array.isArray(point) &&
+        point.length === 2 &&
+        isNumber(point[0]) &&
+        isNumber(point[1]),
+    )
+  );
+}
+
 /** Connector endpoints and their optional bindings. */
 function hasEndpoints(value: Fields): boolean {
   return (
@@ -155,6 +170,7 @@ const elementFieldChecks = {
     isOptionalNumber(v.height),
   arrow: hasEndpoints,
   line: hasEndpoints,
+  freedraw: hasStrokePoints,
 } satisfies Record<ElementType, (value: Fields) => boolean>;
 
 function isElementType(value: unknown): value is ElementType {

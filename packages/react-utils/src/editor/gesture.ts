@@ -7,6 +7,7 @@ import { boundsFromPoints, HANDLE_CURSORS } from "./hit-test";
 
 import type { DragSession } from "./drag";
 import type { ResizeSession } from "./resize";
+import type { DrawSession } from "./draw";
 
 type Point = { x: number; y: number };
 
@@ -28,6 +29,8 @@ export type Gesture =
   | ({ type: "resizing" } & ResizeSession)
   /** Click-drag out the size of a just-added element. */
   | { type: "creating"; elementType: CreationType; elementId: string; startPoint: Point }
+  /** A pencil stroke growing from press to release. */
+  | ({ type: "drawing" } & DrawSession)
   | {
       type: "marqueeing";
       startPoint: Point;
@@ -37,8 +40,8 @@ export type Gesture =
       /** Shift held at press: add to the selection on release. */
       additive: boolean;
     }
-  /** A marquee dropped with Escape; waits for pointer-up, then does nothing. */
-  | { type: "marqueeCancelled" };
+  /** A marquee or stroke dropped with Escape; waits for pointer-up, then does nothing. */
+  | { type: "cancelled" };
 
 export const IDLE: Gesture = { type: "none" };
 
@@ -47,9 +50,11 @@ export function moveMarquee(gesture: Gesture, point: Point): Gesture {
   return gesture.type === "marqueeing" ? { ...gesture, currentPoint: point } : gesture;
 }
 
-/** Escape drops a marquee. Other gestures carry on. */
-export function cancelMarquee(gesture: Gesture): Gesture {
-  return gesture.type === "marqueeing" ? { type: "marqueeCancelled" } : gesture;
+/** Escape drops a marquee or a stroke in progress. Other gestures carry on. */
+export function cancelOnEscape(gesture: Gesture): Gesture {
+  return gesture.type === "marqueeing" || gesture.type === "drawing"
+    ? { type: "cancelled" }
+    : gesture;
 }
 
 export function getMarqueeBounds(gesture: Gesture): Bounds | null {
@@ -69,6 +74,15 @@ export function panViewport(
     x: gesture.viewportStart.x - (screenPoint.x - gesture.screenStart.x) / viewport.zoom,
     y: gesture.viewportStart.y - (screenPoint.y - gesture.screenStart.y) / viewport.zoom,
   };
+}
+
+/** Click-drag out the size of `element`, just added at `point`. */
+export function startCreation(
+  elementType: CreationType,
+  element: DiagramElement,
+  point: Point,
+): Extract<Gesture, { type: "creating" }> {
+  return { type: "creating", elementType, elementId: element.id, startPoint: point };
 }
 
 /** Size patch for an element being click-dragged out from its start point. */
@@ -114,9 +128,10 @@ export function gestureCursor(gesture: Gesture): string | null {
     case "dragging":
       return "move";
     case "marqueeing":
-    case "marqueeCancelled":
+    case "cancelled":
       return "crosshair";
     case "creating":
+    case "drawing":
     case "none":
       return null;
   }
