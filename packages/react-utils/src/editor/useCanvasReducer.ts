@@ -100,6 +100,11 @@ export type CanvasAction =
   | { type: "CLEAR_SELECTION" }
   | { type: "BEGIN_HISTORY" }
   | { type: "END_HISTORY" }
+  /**
+   * Closes every open history batch and puts back the elements and selection
+   * from when it began, leaving no undo step.
+   */
+  | { type: "CANCEL_HISTORY" }
   | { type: "UNDO" }
   | { type: "REDO" };
 
@@ -391,6 +396,17 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
       }
 
       return { ...state, historyBatchDepth: 0 };
+    }
+
+    case "CANCEL_HISTORY": {
+      const start = state.past[state.past.length - 1];
+      if (state.historyBatchDepth <= 0 || !start) return state;
+      return {
+        ...state,
+        ...restoreSnapshot(state, start),
+        past: state.past.slice(0, -1),
+        historyBatchDepth: 0,
+      };
     }
 
     case "UNDO": {

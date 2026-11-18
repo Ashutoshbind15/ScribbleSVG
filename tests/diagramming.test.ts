@@ -1074,6 +1074,31 @@ describe("canvas reducer", () => {
     assert.equal(state.historyBatchDepth, 0);
   });
 
+  test("a cancelled history batch restores its start and leaves no undo step", () => {
+    const rectangle = createRectangle({ id: "rect-001" });
+    let state = canvasReducer(createCanvasState(), {
+      type: "ADD_ELEMENT",
+      element: rectangle,
+    });
+    state = canvasReducer(state, { type: "SET_SELECTION", ids: ["rect-001"] });
+    const before = state;
+
+    state = canvasReducer(state, { type: "BEGIN_HISTORY" });
+    state = canvasReducer(state, { type: "BEGIN_HISTORY" });
+    state = canvasReducer(state, { type: "CLEAR_SELECTION" });
+    state = canvasReducer(state, {
+      type: "ADD_ELEMENT",
+      element: createCircle({ id: "circle-001" }),
+    });
+    state = canvasReducer(state, { type: "CANCEL_HISTORY" });
+
+    assert.equal(state.document.elements, before.document.elements);
+    assert.deepEqual([...state.selectedIds], ["rect-001"]);
+    assert.deepEqual(state.past, before.past);
+    assert.equal(state.historyBatchDepth, 0);
+    assert.equal(canvasReducer(state, { type: "CANCEL_HISTORY" }), state);
+  });
+
   test("viewport and selection changes do not create history entries", () => {
     const rectangle = createRectangle({ id: "rect-001" });
     let state = canvasReducer(createCanvasState(), {

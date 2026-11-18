@@ -115,7 +115,9 @@ switches to the select tool in one undoable transition. `INSERT_IMAGE` shares
 that placement logic after fitting and validating the image.
 `SELECT_ELEMENT` selects an existing id and switches tools without changing
 the document or adding history. Creation and subsequent size/text updates can
-share a `BEGIN_HISTORY` / `END_HISTORY` group.
+share a `BEGIN_HISTORY` / `END_HISTORY` group. `CANCEL_HISTORY` drops an open group
+instead: the elements and selection go back to how they were at
+`BEGIN_HISTORY`, and no undo step is left.
 
 ## Images
 
