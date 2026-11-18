@@ -219,6 +219,7 @@ function createCanvasState(
     selectedIds: new Set(),
     tool: "select",
     activeIconId: null,
+    pencilSmoothing: true,
     past: [],
     future: [],
     historyBatchDepth: 0,
@@ -836,6 +837,7 @@ describe("canvas reducer", () => {
       "diamond",
       "icon",
       "text",
+      "pencil",
       "line",
       "arrow",
     ];

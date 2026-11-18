@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DiagramElement, ImageElement, RectangleElement } from "@scribblesvg/core";
+import { startDraw, drawPatch } from "../packages/react-utils/src/editor/draw.ts";
 import { startDrag, dragPatches } from "../packages/react-utils/src/editor/drag.ts";
 import { startResize, startGroupScale, resizePatches } from "../packages/react-utils/src/editor/resize.ts";
 
@@ -20,6 +21,13 @@ test("drag patches use original positions for boxes, circles and connectors", ()
     { startX: 5, startY: -5, endX: 45, endY: 40 },
   ]);
   assert.equal(rect.x, 0);
+});
+
+test("draw patches add each batch of samples once and return the whole stroke", () => {
+  const draw = startDraw({ type: "freedraw", id: "s", seed: 1, points: [[0, 0]] }, 1, false);
+  assert.deepEqual(drawPatch(draw, [{ x: 5, y: 0 }]), { points: [[0, 0], [5, 0]] });
+  assert.deepEqual(drawPatch(draw, [{ x: 10, y: 0 }, { x: 15, y: 0 }]), { points: [[0, 0], [5, 0], [10, 0], [15, 0]] });
+  assert.deepEqual(drawPatch(draw, []), { points: [[0, 0], [5, 0], [10, 0], [15, 0]] });
 });
 
 test("resize uses its original bounds, clamps minimum size and keeps opposite corner", () => {

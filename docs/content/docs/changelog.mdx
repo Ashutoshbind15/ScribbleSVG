@@ -13,6 +13,16 @@ Package versions in this monorepo (see each package’s `package.json` for the s
 
 ## Unreleased
 
+Freehand pencil:
+
+- New **pencil** tool in the editor toolbar. Each press-drag draws one stroke, and the tool stays active between strokes. Like dragging out a shape, the stroke is in the document from the press and `onChange` fires as it grows; it is one undo step.
+- While the pencil is active, a toggle beside it turns smoothing on or off. It starts on each time the editor mounts. Smoothing evens out hand wobble and keeps deliberate corners sharp.
+- New `freedraw` element type in `@scribblesvg/core`: `points: [number, number][]` in canvas coordinates, drawn as one smooth path without Rough.js. Strokes can be selected, moved, resized, group-scaled, copied and pasted. They have no label, and connectors don't bind to them.
+- New core type export: `FreedrawElement`. Stroke smoothing and path building stay internal.
+- Escape while drawing drops the stroke in progress and leaves nothing to undo.
+- `PLACE_ELEMENT` takes an optional `select` (default true). With `select: false` it clears the selection and keeps the current tool, which is how each pencil stroke is placed.
+- **Behaviour change for embedders:** `DiagramElement` and `ToolType` each gain a member (`freedraw`, `pencil`), so an exhaustive `switch` over either needs a new case. `isBindable` now returns false for strokes. `CanvasState` gains `pencilSmoothing`.
+
 Keyboard shortcuts are scoped to the focused editor:
 
 - **Behaviour change for embedders:** shortcuts no longer work without focus. They used to listen on `window`, so keys typed anywhere on the page (a form field, a second editor) could edit the diagram. Now they only apply while focus is inside the editor; pressing the canvas or a toolbar button gives it focus.

@@ -20,6 +20,12 @@ import {
 } from "../packages/react-utils/src/editor/group-scale.ts";
 import { startDrag, dragPatches } from "../packages/react-utils/src/editor/drag.ts";
 import { startResize, resizePatches } from "../packages/react-utils/src/editor/resize.ts";
+import {
+  canvasReducer,
+  type CanvasState,
+} from "../packages/react-utils/src/editor/useCanvasReducer.ts";
+import { cancelOnEscape } from "../packages/react-utils/src/editor/gesture.ts";
+import { drawPatch, startDraw } from "../packages/react-utils/src/editor/draw.ts";
 
 function stroke(points: FreedrawElement["points"], id = "stroke"): FreedrawElement {
   return { id, type: "freedraw", seed: 1, points };
@@ -115,5 +121,53 @@ describe("freedraw elements", () => {
   test("a thin stroke doesn't block shrinking its group", () => {
     const flat = stroke([[0, 0], [200, 1]]);
     assert.ok(getMinGroupScale([flat]) < 0.1);
+  });
+});
+
+describe("pencil", () => {
+  const shape = { id: "r", type: "rectangle", seed: 1, x: 0, y: 0, width: 10, height: 10 } as const;
+  const base: CanvasState = {
+    document: { version: 1, viewport: { x: 0, y: 0, zoom: 1 }, elements: [shape] },
+    selectedIds: new Set(["r"]),
+    tool: "pencil",
+    activeIconId: null,
+    pencilSmoothing: true,
+    past: [],
+    future: [],
+    historyBatchDepth: 0,
+    size: { width: 800, height: 600 },
+    fitPending: false,
+  };
+
+  // The dispatches the pencil makes: press, two moves, then release or Escape.
+  function drawStroke(end: "END_HISTORY" | "CANCEL_HISTORY"): CanvasState {
+    const element = stroke([[0, 0]], "s");
+    const session = startDraw(element, 1, false);
+    let state = canvasReducer(base, { type: "BEGIN_HISTORY" });
+    state = canvasReducer(state, { type: "PLACE_ELEMENT", element, select: false });
+    for (const point of [{ x: 5, y: 5 }, { x: 10, y: 0 }]) {
+      state = canvasReducer(state, { type: "UPDATE_ELEMENT", id: "s", patch: drawPatch(session, [point]) });
+    }
+    return canvasReducer(state, { type: end });
+  }
+
+  test("a released stroke is one undo step", () => {
+    let state = drawStroke("END_HISTORY");
+    assert.deepEqual((state.document.elements[1] as FreedrawElement).points, [[0, 0], [5, 5], [10, 0]]);
+    assert.equal(state.selectedIds.size, 0);
+
+    state = canvasReducer(state, { type: "UNDO" });
+    assert.deepEqual(state.document.elements, [shape]);
+    assert.deepEqual([...state.selectedIds], ["r"]);
+  });
+
+  test("Escape drops the stroke and leaves nothing to undo", () => {
+    const state = drawStroke("CANCEL_HISTORY");
+    assert.deepEqual(state.document.elements, [shape]);
+    assert.deepEqual([...state.selectedIds], ["r"]);
+    assert.equal(state.past.length, 0);
+
+    const drawing = { type: "drawing", ...startDraw(stroke([[0, 0]], "s"), 1, true) } as const;
+    assert.deepEqual(cancelOnEscape(drawing), { type: "cancelled" });
   });
 });

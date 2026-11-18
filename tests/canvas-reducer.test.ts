@@ -218,6 +218,16 @@ for (const grouped of [false, true]) {
   });
 }
 
+test("placement without select clears the selection and keeps the tool", () => {
+  const initial = stateWith({ selectedIds: new Set([rect.id]), tool: "pencil" });
+  let state = canvasReducer(initial, { type: "PLACE_ELEMENT", element: { ...rect, id: "new" }, select: false });
+  assert.equal(state.tool, "pencil");
+  assert.equal(state.selectedIds.size, 0);
+  assert.deepEqual(state.document.elements.map((el) => el.id), [rect.id, "new"]);
+  state = canvasReducer(state, { type: "UNDO" });
+  assert.deepEqual(state.selectedIds, initial.selectedIds);
+});
+
 test("bulk movement reanchors current bound endpoints in one history group", () => {
   const arrow = { type: "arrow" as const, id: "a", seed: 1, startX: 2000, startY: 500, endX: 3000, endY: 500, startBinding: "r" };
   const free = { ...arrow, id: "free", startBinding: undefined };

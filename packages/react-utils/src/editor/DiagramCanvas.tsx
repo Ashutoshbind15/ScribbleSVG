@@ -505,6 +505,10 @@ export function DiagramCanvas({
           onToolChange={(tool, activeIconId) =>
             dispatch({ type: "SET_TOOL", tool, activeIconId })
           }
+          pencilSmoothing={state.pencilSmoothing}
+          onPencilSmoothingChange={(enabled) =>
+            dispatch({ type: "SET_PENCIL_SMOOTHING", enabled })
+          }
         />
         <div className="scribblesvg-editor__history">
           <button
