@@ -17,6 +17,11 @@ export interface BaseElement {
   id: string; // UUID
   type: ElementType;
   seed: number; // deterministic Rough.js rendering
+  /**
+   * Elements sharing a groupId are selected, moved and scaled together.
+   * A groupId held by only one element has no effect.
+   */
+  groupId?: string;
 }
 
 // Shape elements

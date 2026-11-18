@@ -36,9 +36,11 @@ function isOptionalNumber(value: unknown): boolean {
 
 // ── Field groups shared by several element types ──
 
-/** `id` and `seed`, present on every element. */
+/** `id` and `seed`, present on every element, and the optional `groupId`. */
 function hasBaseFields(value: Fields): boolean {
-  return isString(value.id) && isNumber(value.seed);
+  return (
+    isString(value.id) && isNumber(value.seed) && isOptionalString(value.groupId)
+  );
 }
 
 /** Top-left box: `x`, `y`, `width`, `height`. */
