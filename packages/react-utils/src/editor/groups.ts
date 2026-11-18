@@ -24,8 +24,8 @@ export function expandToGroups(
 }
 
 /**
- * True when the selection is exactly the group `id` belongs to, so a click on
- * `id` should narrow the selection to that one member.
+ * True when the selection is exactly the group `id` belongs to, so a double-click
+ * on `id` should narrow the selection to that one member.
  */
 export function isWholeGroupSelected(
   elements: DiagramElement[],

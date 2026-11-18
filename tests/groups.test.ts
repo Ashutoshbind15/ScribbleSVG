@@ -8,6 +8,7 @@ import {
   isWholeGroupSelected,
   ungroupPatches,
 } from "../packages/react-utils/src/editor/groups.ts";
+import { resolveMarqueeSelection } from "../packages/react-utils/src/editor/hit-test.ts";
 import { canvasReducer } from "../packages/react-utils/src/editor/useCanvasReducer.ts";
 
 function rect(id: string, x: number, groupId?: string): RectangleElement {
@@ -106,4 +107,20 @@ test("ungroupPatches touches only grouped elements in the set", () => {
     ungroupPatches(elements, new Set(["a", "c", "d"])).map((p) => p.id),
     ["a", "d"],
   );
+});
+
+test("a box touching one member selects its whole group", () => {
+  const drag = (additive: boolean, selected: string[]) =>
+    resolveMarqueeSelection({
+      // Crosses only b's left edge (x = 50)
+      startPoint: { x: 45, y: 10 },
+      endPoint: { x: 55, y: 20 },
+      screenStart: { x: 0, y: 0 },
+      screenEnd: { x: 100, y: 100 },
+      additive,
+      selectedIds: new Set(selected),
+      elements,
+    });
+  assert.deepEqual(drag(false, []), { type: "set", ids: ["a", "b"] });
+  assert.deepEqual(drag(true, ["c"]), { type: "set", ids: ["c", "a", "b"] });
 });
