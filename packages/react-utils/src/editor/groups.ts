@@ -66,3 +66,51 @@ export function ungroupPatches(
     .filter((el) => ids.has(el.id) && el.groupId !== undefined)
     .map((el) => ({ id: el.id, patch: { groupId: undefined } }));
 }
+
+export interface SelectionOutlines {
+  /** Selected loose elements and members of partly selected groups. */
+  elements: DiagramElement[];
+  /**
+   * Fully selected groups, each outlined as one object. Empty when the
+   * selection is exactly one group, since the selection box already outlines it.
+   */
+  groups: DiagramElement[][];
+}
+
+/** What the selection overlay outlines, so a selected group reads as one object. */
+export function getSelectionOutlines(
+  elements: DiagramElement[],
+  selectedIds: ReadonlySet<string>,
+): SelectionOutlines {
+  const members = new Map<string, DiagramElement[]>();
+  for (const el of elements) {
+    if (el.groupId === undefined) continue;
+    const group = members.get(el.groupId);
+    if (group) group.push(el);
+    else members.set(el.groupId, [el]);
+  }
+
+  const outlines: SelectionOutlines = { elements: [], groups: [] };
+  const seen = new Set<string>();
+  for (const el of elements) {
+    if (!selectedIds.has(el.id)) continue;
+    const { groupId } = el;
+    const group = groupId === undefined ? undefined : members.get(groupId);
+    if (
+      groupId === undefined ||
+      !group ||
+      group.length < 2 ||
+      !group.every((member) => selectedIds.has(member.id))
+    ) {
+      outlines.elements.push(el);
+      continue;
+    }
+    if (seen.has(groupId)) continue;
+    seen.add(groupId);
+    outlines.groups.push(group);
+  }
+  if (outlines.elements.length === 0 && outlines.groups.length === 1) {
+    outlines.groups = [];
+  }
+  return outlines;
+}
